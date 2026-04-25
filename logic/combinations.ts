@@ -25,31 +25,36 @@ function validateSequenceValues(values: number[], jokerCount: number, maxRange: 
 
 export const isSequence = (cards: Card[]): boolean => {
   if (cards.length === 0) return false;
-  if (cards.length > 13) return false; // A sequence cannot exceed 13 cards (2 to A)
+  if (cards.length > 13) return false; 
   
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
+  const lockedJokers = jokers.filter(j => j.assignedValue !== undefined);
+  const freeJokersCount = jokers.length - lockedJokers.length;
   
-  if (regulars.length === 0) {
+  if (regulars.length === 0 && lockedJokers.length === 0) {
     return cards.length >= 3;
   }
   
-  const suit = regulars[0].suit;
+  const sampleCard = regulars.length > 0 ? regulars[0] : null;
+  const suit = sampleCard ? sampleCard.suit : 'none';
   const sameSuit = regulars.every(c => c.suit === suit);
   if (!sameSuit) return false;
   
-  const hasAce = regulars.some(c => c.rank === 'A');
-  
-  // Spades has no regular Ace (Ace of Spades is a Joker), so max range is 12 (2-K)
   const maxRange = suit === 'spades' ? 12 : 14;
 
   // Test 1: Aces as 14
-  const test1 = validateSequenceValues(regulars.map(c => c.value), jokers.length, maxRange);
+  const values1 = [...regulars.map(c => c.value), ...lockedJokers.map(j => j.assignedValue!)];
+  const test1 = validateSequenceValues(values1, freeJokersCount, maxRange);
   if (test1) return true;
 
   // Test 2: Aces as 1
-  if (hasAce && suit !== 'spades') {
-    const test2 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length, 13);
+  if (suit !== 'spades') {
+    const values2 = [
+      ...regulars.map(c => c.rank === 'A' ? 1 : c.value),
+      ...lockedJokers.map(j => j.assignedValue === 14 ? 1 : j.assignedValue!)
+    ];
+    const test2 = validateSequenceValues(values2, freeJokersCount, 13);
     if (test2) return true;
   }
   
@@ -113,8 +118,9 @@ export const isSameValueCombo = (cards: Card[]): boolean => {
 export const sortSequence = (cards: Card[]): Card[] => {
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
+  const lockedJokers = jokers.filter(j => j.assignedValue !== undefined);
   
-  if (regulars.length === 0) return jokers;
+  if (regulars.length === 0 && lockedJokers.length === 0) return jokers;
   
   let useAceAsOne = false;
   const hasAce = regulars.some(c => c.rank === 'A');
@@ -129,37 +135,34 @@ export const sortSequence = (cards: Card[]): Card[] => {
     }
   }
   
-  const sortedRegulars = [...regulars].sort((a, b) => {
-    const valA = (useAceAsOne && a.rank === 'A') ? 1 : a.value;
-    const valB = (useAceAsOne && b.rank === 'A') ? 1 : b.value;
+  const sortedRegulars = [
+    ...regulars,
+    ...lockedJokers
+  ].sort((a, b) => {
+    const valA = a.isJoker ? a.assignedValue! : ((useAceAsOne && a.rank === 'A') ? 1 : a.value);
+    const valB = b.isJoker ? b.assignedValue! : ((useAceAsOne && b.rank === 'A') ? 1 : b.value);
     return valA - valB;
   });
   
-  // Find a start value that respects any existing Joker assignments to maintain stability
-  let startVal = (useAceAsOne && sortedRegulars[0].rank === 'A') ? 1 : sortedRegulars[0].value;
-  const assignedJokers = jokers.filter(j => j.assignedValue !== undefined);
-  if (assignedJokers.length > 0) {
-    const minAssigned = Math.min(...assignedJokers.map(j => j.assignedValue!));
-    // If the joker was assigned a value lower than our first regular card, 
-    // try to start the sequence from that joker's value.
-    if (minAssigned < startVal && (startVal - minAssigned) <= jokers.length) {
-      startVal = minAssigned;
-    }
-  }
-
+  // Start from the lowest card available (regular or locked joker)
+  let startVal = sortedRegulars[0].isJoker ? sortedRegulars[0].assignedValue! : ((useAceAsOne && sortedRegulars[0].rank === 'A') ? 1 : sortedRegulars[0].value);
+  
   const result: Card[] = [];
   let currentVal = startVal;
   let regularIdx = 0;
   let jokerIdx = 0;
+  const freeJokers = jokers.filter(j => j.assignedValue === undefined);
 
   while (regularIdx < sortedRegulars.length) {
-    const rVal = (useAceAsOne && sortedRegulars[regularIdx].rank === 'A') ? 1 : sortedRegulars[regularIdx].value;
+    const card = sortedRegulars[regularIdx];
+    const rVal = card.isJoker ? card.assignedValue! : ((useAceAsOne && card.rank === 'A') ? 1 : card.value);
+    
     if (rVal === currentVal) {
-      result.push(sortedRegulars[regularIdx]);
+      result.push(card);
       regularIdx++;
     } else {
-      if (jokerIdx < jokers.length) {
-        result.push(jokers[jokerIdx]);
+      if (jokerIdx < freeJokers.length) {
+        result.push(freeJokers[jokerIdx]);
         jokerIdx++;
       } else {
         break;
@@ -171,12 +174,12 @@ export const sortSequence = (cards: Card[]): Card[] => {
   const suit = sortedRegulars.length > 0 ? sortedRegulars[0].suit : 'none';
   const maxVal = suit === 'spades' ? 13 : (useAceAsOne ? 13 : 14);
 
-  while (jokerIdx < jokers.length) {
+  while (jokerIdx < freeJokers.length) {
     if (currentVal <= maxVal) {
-      result.push(jokers[jokerIdx]);
+      result.push(freeJokers[jokerIdx]);
       currentVal++;
     } else {
-      result.unshift(jokers[jokerIdx]);
+      result.unshift(freeJokers[jokerIdx]);
       startVal--; // Update start value because we unshifted
     }
     jokerIdx++;
@@ -417,12 +420,13 @@ export const extractSameValueCombo = (hand: Card[], minCount: number): { combo: 
   return { combo: [], remainingHand: hand };
 };
 
-export const calculateHandValue = (hand: Card[]): number => {
+export const calculateHandValue = (hand: Card[], isSongWin: boolean): number => {
   const hasJoker = hand.some(c => c.isJoker);
-  if (hasJoker) return 100;
+  if (hasJoker && isSongWin) return 100;
 
   const sum = hand.reduce((acc, card) => acc + card.value, 0);
-  return Math.min(sum, 100);
+  const cap = isSongWin ? 100 : 50;
+  return Math.min(sum, cap);
 };
 
 export const calculateWinnerBonus = (finalMeld: Card[], isAttachment?: boolean): number => {

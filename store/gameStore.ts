@@ -238,9 +238,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       if (!hasValidOpening) {
-        // Mark for instant game over
-        (newPlayers[i] as any).instantGameOver = true;
-        newPlayers[i] = { ...player, hand: [] }; // hand disappears
+        // Mark for instant game over due to deadlock in opening
+        (newPlayers[i] as any).deadlockedInOpening = true;
       }
       // If hasValidOpening is true, they keep their cards in hand.
     }
@@ -251,11 +250,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     // Give worst ranks to all instant losers
     for (let i = 0; i < newPlayers.length; i++) {
-      if ((newPlayers[i] as any).instantGameOver) {
+      if ((newPlayers[i] as any).deadlockedInOpening) {
         newPlayers[i].finishedOrder = currentBadRank;
         currentBadRank--;
         newFinishCount++;
-        delete (newPlayers[i] as any).instantGameOver;
       }
     }
 
@@ -281,8 +279,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         let roundScore = 0;
         if (p.id === newWinnerId) {
           roundScore = -50; // Standard win bonus for opening phase win
+        } else if ((p as any).deadlockedInOpening) {
+          roundScore = 100; // Deadlock in opening penalty
         } else {
-          roundScore = calculateHandValue(p.hand);
+          roundScore = calculateHandValue(p.hand, !!newWinnerId);
         }
         
         const newTotalScore = p.totalScore + roundScore;
@@ -424,7 +424,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         if (p.id === newWinnerId) {
           roundScore = winnerBonus;
         } else {
-          roundScore = calculateHandValue(p.hand);
+          roundScore = calculateHandValue(p.hand, true);
         }
         
         const newTotalScore = p.totalScore + roundScore;
@@ -537,8 +537,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
         let roundScore = 0;
         if (newWinnerId && p.id === newWinnerId) {
           roundScore = winnerBonus;
+        } else if ((p as any).deadlockedInOpening) {
+          roundScore = 100;
         } else {
-          roundScore = calculateHandValue(p.hand);
+          roundScore = calculateHandValue(p.hand, !!newWinnerId);
         }
         
         const newTotalScore = p.totalScore + roundScore;
@@ -703,6 +705,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       hasOpened: false,
       openingValue: undefined,
       pointsGainedThisRound: undefined,
+      deadlockedInOpening: false,
     }));
 
     set({
