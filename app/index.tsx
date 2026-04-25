@@ -618,6 +618,15 @@ export default function GameBoard() {
   }, []);
 
   useEffect(() => {
+    if (currentHint) {
+      const timer = setTimeout(() => {
+        clearHint();
+      }, 5000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentHint, clearHint]);
+
+  useEffect(() => {
     async function playSFX() {
       if (!sfxTrigger) return;
       try {

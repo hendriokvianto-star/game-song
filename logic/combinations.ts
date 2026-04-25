@@ -135,8 +135,20 @@ export const sortSequence = (cards: Card[]): Card[] => {
     return valA - valB;
   });
   
+  // Find a start value that respects any existing Joker assignments to maintain stability
+  let startVal = (useAceAsOne && sortedRegulars[0].rank === 'A') ? 1 : sortedRegulars[0].value;
+  const assignedJokers = jokers.filter(j => j.assignedValue !== undefined);
+  if (assignedJokers.length > 0) {
+    const minAssigned = Math.min(...assignedJokers.map(j => j.assignedValue!));
+    // If the joker was assigned a value lower than our first regular card, 
+    // try to start the sequence from that joker's value.
+    if (minAssigned < startVal && (startVal - minAssigned) <= jokers.length) {
+      startVal = minAssigned;
+    }
+  }
+
   const result: Card[] = [];
-  let currentVal = (useAceAsOne && sortedRegulars[0].rank === 'A') ? 1 : sortedRegulars[0].value;
+  let currentVal = startVal;
   let regularIdx = 0;
   let jokerIdx = 0;
 
@@ -165,11 +177,20 @@ export const sortSequence = (cards: Card[]): Card[] => {
       currentVal++;
     } else {
       result.unshift(jokers[jokerIdx]);
+      startVal--; // Update start value because we unshifted
     }
     jokerIdx++;
   }
-  
-  return result;
+
+  // Final pass: Ensure all Jokers have their assignedValue updated for stability
+  let runningVal = startVal;
+  return result.map(c => {
+    if (c.isJoker) {
+      return { ...c, assignedValue: runningVal++ };
+    }
+    runningVal++;
+    return c;
+  });
 };
 
 export const sortSameValueCombo = (cards: Card[]): Card[] => {
@@ -397,8 +418,11 @@ export const extractSameValueCombo = (hand: Card[], minCount: number): { combo: 
 };
 
 export const calculateHandValue = (hand: Card[]): number => {
+  const hasJoker = hand.some(c => c.isJoker);
+  if (hasJoker) return 100;
+
   const sum = hand.reduce((acc, card) => acc + card.value, 0);
-  return Math.min(sum, 50);
+  return Math.min(sum, 100);
 };
 
 export const calculateWinnerBonus = (finalMeld: Card[], isAttachment?: boolean): number => {

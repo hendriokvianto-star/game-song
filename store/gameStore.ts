@@ -515,26 +515,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let newStatus: GameState['status'] = state.status;
     let newWinnerId = state.winnerId;
 
-    // If this was the last active player, they are the winner (survivor)
-    // unless someone already finished before them.
-    if (!state.winnerId && remainingCount === 1) {
-      newWinnerId = currentPlayer.id;
-      set({ ceremonyWinnerId: currentPlayer.id });
-      get().triggerSFX('win');
-    }
     get().triggerSFX('mati');
 
     if (countActivePlayers(newPlayers) === 0) {
       newStatus = 'finished';
 
+      // If everyone deadlocked and no one actually finished the game, 
+      // then there is NO winner and NO winner bonus.
+      if (!state.winnerId) {
+        newWinnerId = undefined;
+      }
+
       // Calculate Scores for the round
-      const lastFinishingMeld = state.lastFinishingMeld; // Use previous if exists
-      const winnerBonus = calculateWinnerBonus(lastFinishingMeld || [], false); 
+      const lastFinishingMeld = state.lastFinishingMeld; 
+      // If we have a real winnerId (from someone finishing), use the bonus.
+      // Otherwise (total deadlock), winnerBonus is 0.
+      const winnerBonus = newWinnerId ? calculateWinnerBonus(lastFinishingMeld || [], false) : 0; 
+      
       let finalWinnerIdForMatch = undefined;
       newPlayers.forEach((p, idx) => {
         let roundScore = 0;
-        if (p.id === newWinnerId) {
-          roundScore = -50; // Standard winner bonus for winning by elimination
+        if (newWinnerId && p.id === newWinnerId) {
+          roundScore = winnerBonus;
         } else {
           roundScore = calculateHandValue(p.hand);
         }

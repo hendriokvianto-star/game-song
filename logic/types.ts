@@ -8,6 +8,7 @@ export interface Card {
   value: number;
   isJoker?: boolean;
   isDead?: boolean; // Flag for a Joker that has killed a SameValueCombo
+  assignedValue?: number; // Sticky value for Jokers in sequences
 }
 
 export interface Player {
