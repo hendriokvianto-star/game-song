@@ -1,18 +1,31 @@
 import { Card } from './types';
 
-function validateSequenceValues(values: number[], jokerCount: number): boolean {
+function validateSequenceValues(values: number[], jokerCount: number, maxRange: number): boolean {
+  if (values.length === 0) return jokerCount >= 3;
   const sorted = [...values].sort((a, b) => a - b);
+  const min = sorted[0];
+  const max = sorted[sorted.length - 1];
+  
+  // Rule: Total range covered cannot exceed maxRange (13 or 14)
+  if (max - min + 1 > maxRange) return false;
+  
   let gaps = 0;
   for (let i = 0; i < sorted.length - 1; i++) {
     const diff = sorted[i+1] - sorted[i];
     if (diff === 0) return false; 
     gaps += (diff - 1);
   }
+  
+  // Total length if we fill all gaps
+  const requiredLength = (max - min + 1);
+  if (requiredLength > maxRange) return false;
+
   return jokerCount >= gaps;
 }
 
 export const isSequence = (cards: Card[]): boolean => {
   if (cards.length === 0) return false;
+  if (cards.length > 13) return false; // A sequence cannot exceed 13 cards (2 to A)
   
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
@@ -27,13 +40,16 @@ export const isSequence = (cards: Card[]): boolean => {
   
   const hasAce = regulars.some(c => c.rank === 'A');
   
+  // Spades has no regular Ace (Ace of Spades is a Joker), so max range is 12 (2-K)
+  const maxRange = suit === 'spades' ? 12 : 14;
+
   // Test 1: Aces as 14
-  const test1 = validateSequenceValues(regulars.map(c => c.value), jokers.length);
+  const test1 = validateSequenceValues(regulars.map(c => c.value), jokers.length, maxRange);
   if (test1) return true;
 
   // Test 2: Aces as 1
-  if (hasAce) {
-    const test2 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length);
+  if (hasAce && suit !== 'spades') {
+    const test2 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length, 13);
     if (test2) return true;
   }
   
@@ -104,8 +120,10 @@ export const sortSequence = (cards: Card[]): Card[] => {
   const hasAce = regulars.some(c => c.rank === 'A');
   
   if (hasAce) {
-    const valid14 = validateSequenceValues(regulars.map(c => c.value), jokers.length);
-    const valid1 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length);
+    const suit = regulars[0].suit;
+    const maxRange = suit === 'spades' ? 12 : 14;
+    const valid14 = validateSequenceValues(regulars.map(c => c.value), jokers.length, maxRange);
+    const valid1 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length, 13);
     if (valid1 && !valid14) {
       useAceAsOne = true;
     }
@@ -168,8 +186,10 @@ function getCoveredValues(seq: Card[]): number[] {
   let useAceAsOne = false;
   const hasAce = regulars.some(c => c.rank === 'A');
   if (hasAce) {
-    const valid14 = validateSequenceValues(regulars.map(c => c.value), jokers.length);
-    const valid1 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length);
+    const suit = regulars[0].suit;
+    const maxRange = suit === 'spades' ? 12 : 14;
+    const valid14 = validateSequenceValues(regulars.map(c => c.value), jokers.length, maxRange);
+    const valid1 = validateSequenceValues(regulars.map(c => c.rank === 'A' ? 1 : c.value), jokers.length, 13);
     if (valid1 && !valid14) useAceAsOne = true;
   }
   
@@ -230,9 +250,11 @@ export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]
         const hasAce = activeSequences[i].some(c => c.rank === 'A' && !c.isJoker) || playedRegulars.some(c => c.rank === 'A');
         if (hasAce) {
           const combinedRegulars = combined.filter(c => !c.isJoker);
+          const suit = combinedRegulars[0].suit;
+          const maxRange = suit === 'spades' ? 12 : 14;
           const combinedJokersCount = combined.filter(c => c.isJoker).length;
-          const valid14 = validateSequenceValues(combinedRegulars.map(c => c.value), combinedJokersCount);
-          const valid1 = validateSequenceValues(combinedRegulars.map(c => c.rank === 'A' ? 1 : c.value), combinedJokersCount);
+          const valid14 = validateSequenceValues(combinedRegulars.map(c => c.value), combinedJokersCount, maxRange);
+          const valid1 = validateSequenceValues(combinedRegulars.map(c => c.rank === 'A' ? 1 : c.value), combinedJokersCount, 13);
           if (valid1 && !valid14) useAceAsOne = true;
         }
 

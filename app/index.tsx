@@ -432,7 +432,8 @@ function RemainingDeck() {
 }
 
 function TableSequences() {
-  const { activeSequences } = useGameStore();
+  const { activeSequences, language } = useGameStore();
+  const t = translations[language];
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
   const toggleHint = (idx: number) => {
@@ -514,7 +515,8 @@ function TableSequences() {
 }
 
 function GameStatusBar() {
-  const { lastPlayInfo, currentPlayerIndex, players, consecutivePasses } = useGameStore();
+  const { lastPlayInfo, currentPlayerIndex, players, consecutivePasses, language } = useGameStore();
+  const t = translations[language];
   const currentPlayer = players[currentPlayerIndex];
 
   return (
@@ -525,11 +527,11 @@ function GameStatusBar() {
         </Text>
       ) : consecutivePasses > 0 ? (
         <Text style={styles.statusText}>
-          {consecutivePasses} pass{consecutivePasses > 1 ? 'es' : ''} in a row
+          {consecutivePasses} {t.passes}
         </Text>
       ) : (
         <Text style={styles.statusText}>
-          {currentPlayer?.name}'s turn
+          {currentPlayer?.name} {t.turn}
         </Text>
       )}
     </View>
@@ -587,6 +589,7 @@ export default function GameBoard() {
     let localSound: Audio.Sound;
     async function playBGM() {
       try {
+        /*
         const { sound } = await Audio.Sound.createAsync(
           require('../assets/sounds/bgm.mp3'),
           { isLooping: true, volume: 0.3 }
@@ -594,11 +597,13 @@ export default function GameBoard() {
         localSound = sound;
         setSound(sound);
         await sound.playAsync();
+        */
+        console.log('BGM logic ready (bgm.mp3 missing)');
       } catch (e) {
         console.log('Error playing BGM:', e);
       }
     }
-    playBGM();
+    // playBGM(); // Disabled until asset exists
 
     // Hide status bar on mobile to maximize screen
     if (Platform.OS !== 'web') {
@@ -618,6 +623,11 @@ export default function GameBoard() {
       try {
         let source;
         let volume = 0.6;
+        /* 
+          NOTE: Audio assets are commented out to prevent crash because files don't exist yet.
+          To enable, add .mp3 files to assets/sounds/ and uncomment the lines below.
+        */
+        /*
         switch (sfxTrigger.type) {
           case 'draw': source = require('../assets/sounds/draw.mp3'); break;
           case 'play': source = require('../assets/sounds/play.mp3'); break;
@@ -626,12 +636,16 @@ export default function GameBoard() {
           case 'deal': source = require('../assets/sounds/deal.mp3'); volume = 0.4; break;
           default: return;
         }
-        const { sound: sfx } = await Audio.Sound.createAsync(source, { shouldPlay: true, volume });
-        sfx.setOnPlaybackStatusUpdate((status) => {
-          if (status.isLoaded && status.didJustFinish) {
-            sfx.unloadAsync();
-          }
-        });
+        if (source) {
+          const { sound: sfx } = await Audio.Sound.createAsync(source, { shouldPlay: true, volume });
+          sfx.setOnPlaybackStatusUpdate((status) => {
+            if (status.isLoaded && status.didJustFinish) {
+              sfx.unloadAsync();
+            }
+          });
+        }
+        */
+        console.log('SFX Triggered (Audio files missing):', sfxTrigger.type);
       } catch (e) {
         console.log('Error playing SFX:', e);
       }
