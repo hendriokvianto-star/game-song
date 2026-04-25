@@ -790,7 +790,19 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startTutorial: () => {
-    set({ tutorialStep: 0 });
+    // Initialize mock players so the board has something to show
+    const mockPlayers: Player[] = [
+      { id: 'p1', name: 'You', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: false, totalScore: 0 },
+      { id: 'p2', name: 'Bot 1', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
+      { id: 'p3', name: 'Bot 2', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
+      { id: 'p4', name: 'Bot 3', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
+      { id: 'p5', name: 'Bot 4', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
+    ];
+    set({ 
+      tutorialStep: 0,
+      players: mockPlayers,
+      status: 'idle'
+    });
   },
 
   nextTutorialStep: () => {

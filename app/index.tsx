@@ -440,6 +440,15 @@ function TableSequences() {
     setExpandedIdx(prev => (prev === idx ? null : idx));
   };
 
+  useEffect(() => {
+    if (expandedIdx !== null) {
+      const timer = setTimeout(() => {
+        setExpandedIdx(null);
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [expandedIdx]);
+
   return (
     <ScrollView style={styles.tableContainer} horizontal={false} contentContainerStyle={{ flexGrow: 1 }}>
       {activeSequences.length > 0 ? (
@@ -586,7 +595,7 @@ export default function GameBoard() {
   const [sound, setSound] = useState<Audio.Sound>();
 
   useEffect(() => {
-    let localSound: Audio.Sound;
+    let localSound: Audio.Sound | undefined = undefined;
     async function playBGM() {
       try {
         /*
@@ -611,9 +620,11 @@ export default function GameBoard() {
     }
 
     return () => {
+      /*
       if (localSound) {
         localSound.unloadAsync();
       }
+      */
     };
   }, []);
 
@@ -691,7 +702,15 @@ export default function GameBoard() {
     }
   }, [currentPlayerIndex, status, players, activeSequences, executeAITurn]);
 
-  if (status === 'idle') {
+  if (showRules) {
+    return <RulesScreen onClose={() => setShowRules(false)} />;
+  }
+
+  // Show game board during tutorial steps >= 1
+  const isTutorialActive = tutorialStep !== null && tutorialStep > 0;
+  const isTutorialStepZero = tutorialStep === 0;
+
+  if (status === 'idle' && !isTutorialActive) {
     return (
       <SafeAreaView style={styles.loadingScreen}>
         <Text style={styles.loadingEmoji}>🃏</Text>
@@ -724,12 +743,10 @@ export default function GameBoard() {
             <Text style={styles.menuButtonText}>🚪 {t.exit}</Text>
           </Pressable>
         </View>
+
+        {tutorialStep !== null && <TutorialOverlay />}
       </SafeAreaView>
     );
-  }
-
-  if (showRules) {
-    return <RulesScreen onClose={() => setShowRules(false)} />;
   }
 
   const humanPlayer = players.find(p => !p.isAI);
@@ -884,6 +901,9 @@ export default function GameBoard() {
 
       {/* Global Dealing Animation Layer */}
       {status === 'dealing' && <DealingTable />}
+
+      {/* Tutorial Overlay */}
+      {tutorialStep !== null && <TutorialOverlay />}
     </SafeAreaView>
   );
 }
