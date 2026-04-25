@@ -101,4 +101,4 @@ Distributed under the MIT License. See `LICENSE` for more information.
 
 ---
 
-Developed with ❤️ by **[Your Name/Username]**
+Developed with ❤️ by **hendriokvianto-star**
