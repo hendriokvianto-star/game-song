@@ -32,9 +32,8 @@ export const isSequence = (cards: Card[]): boolean => {
   const lockedJokers = jokers.filter(j => j.assignedValue !== undefined);
   const freeJokersCount = jokers.length - lockedJokers.length;
   
-  if (regulars.length === 0 && lockedJokers.length === 0) {
-    return cards.length >= 3;
-  }
+  if (regulars.length < 2) return false;
+  if (jokers.length > regulars.length) return false;
   
   const sampleCard = regulars.length > 0 ? regulars[0] : null;
   const suit = sampleCard ? sampleCard.suit : 'none';
@@ -109,10 +108,17 @@ export const isSequenceComplete = (seq: Card[]): boolean => {
 export const isSameValueCombo = (cards: Card[]): boolean => {
   if (cards.length === 0) return false;
   const regulars = cards.filter(c => !c.isJoker);
-  if (regulars.length <= 1) return true; // all jokers or 1 regular + jokers
+  const jokers = cards.filter(c => c.isJoker);
+  if (regulars.length < 2) return false;
+  if (jokers.length > regulars.length) return false;
   
   const val = regulars[0].value;
   return regulars.every(c => c.value === val);
+};
+
+export const isDeadSet = (cards: Card[]): boolean => {
+  const jokersCount = cards.filter(c => c.isJoker).length;
+  return isSameValueCombo(cards) && (jokersCount >= 2 || cards.some(c => c.isDead));
 };
 
 export const sortSequence = (cards: Card[]): Card[] => {
@@ -199,7 +205,13 @@ export const sortSequence = (cards: Card[]): Card[] => {
 export const sortSameValueCombo = (cards: Card[]): Card[] => {
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
-  return [...regulars, ...jokers];
+  const result = [...regulars, ...jokers];
+  // Rule: A Set with 2 or more Jokers is DEAD immediately.
+  // One Joker is allowed (K-K-Joker) and is still ALIVE.
+  if (jokers.length >= 2) {
+    return result.map(c => ({ ...c, isDead: true }));
+  }
+  return result;
 };
 
 function getCoveredValues(seq: Card[]): number[] {
@@ -237,6 +249,67 @@ function isValueBlocked(val: number, activeSequences: Card[][]): boolean {
     }
   }
   return false;
+}
+
+export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], targetIndex: number): { valid: boolean, newSequence: Card[] } {
+  if (targetIndex < 0 || targetIndex >= activeSequences.length) return { valid: false, newSequence: [] };
+  
+  const existing = activeSequences[targetIndex];
+  if (!existing || !Array.isArray(existing)) {
+    console.error("[validatePlayAt] Existing sequence at index", targetIndex, "is not an array:", existing);
+    return { valid: false, newSequence: [] };
+  }
+  
+  const safePlayedCards = Array.isArray(playedCards) ? playedCards : [];
+  const combined = [...existing, ...safePlayedCards];
+  
+  if (isSequence(existing)) {
+    if (isSequence(combined) && !isSequenceComplete(existing)) {
+       // Perform the same Joker replacement check as in validatePlayMulti
+       const prevValues = getCoveredValues(existing);
+       const playedRegulars = playedCards.filter(c => !c.isJoker);
+       let isReplacingJoker = false;
+       
+       if (playedRegulars.length > 0) {
+         let useAceAsOne = false;
+         const hasAce = existing.some(c => c.rank === 'A' && !c.isJoker) || playedRegulars.some(c => c.rank === 'A');
+         if (hasAce) {
+           const combinedRegulars = combined.filter(c => !c.isJoker);
+           const suit = combinedRegulars[0].suit;
+           const maxRange = suit === 'spades' ? 12 : 14;
+           const combinedJokersCount = combined.filter(c => c.isJoker).length;
+           const valid14 = validateSequenceValues(combinedRegulars.map(c => c.value), combinedJokersCount, maxRange);
+           const valid1 = validateSequenceValues(combinedRegulars.map(c => c.rank === 'A' ? 1 : c.value), combinedJokersCount, 13);
+           if (valid1 && !valid14) useAceAsOne = true;
+         }
+
+         for (const pr of playedRegulars) {
+           const prVal = (useAceAsOne && pr.rank === 'A') ? 1 : pr.value;
+           if (prevValues.includes(prVal)) {
+             isReplacingJoker = true;
+             break;
+           }
+         }
+       }
+
+       if (!isReplacingJoker) {
+         return { valid: true, newSequence: sortSequence(combined) };
+       }
+    }
+  } else if (isSameValueCombo(existing)) {
+    if (isDeadSet(existing)) return { valid: false, newSequence: [] }; // Cannot extend already dead set
+    if (isSameValueCombo(combined)) {
+       const hasNewJoker = playedCards.some(c => c.isJoker);
+       const sorted = sortSameValueCombo(combined);
+       // Rule: Adding a Joker to an existing set kills it
+       if (hasNewJoker) {
+         return { valid: true, newSequence: sorted.map(c => ({ ...c, isDead: true })) };
+       }
+       return { valid: true, newSequence: sorted };
+    }
+  }
+  
+  return { valid: false, newSequence: [] };
 }
 
 export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]): { valid: boolean, sequenceIndex: number, newSequence: Card[] } => {
@@ -310,21 +383,18 @@ export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]
     
     // Check if extending a same value combo
     if (isSameValueCombo(combined) && isSameValueCombo(activeSequences[i])) {
-      // Cannot extend a dead combo
-      if (activeSequences[i].some(c => c.isDead)) {
+      // Rule: Cannot extend a dead combo
+      if (isDeadSet(activeSequences[i])) {
         continue;
       }
       
-      // Check if this play kills the combo
-      // Kills if appending exactly 1 card, which is a Joker, to a combo of >= 3 cards
-      if (playedCards.length === 1 && (playedCards[0].isJoker || (playedCards[0].rank === 'A' && playedCards[0].suit === 'spades')) && activeSequences[i].length >= 3) {
-        const newSequence = sortSameValueCombo(combined);
-        // Mark ALL cards in the sequence as dead
-        const killedSeq = newSequence.map(c => ({ ...c, isDead: true }));
-        return { valid: true, sequenceIndex: i, newSequence: killedSeq };
+      const hasNewJoker = playedCards.some(c => c.isJoker);
+      const sorted = sortSameValueCombo(combined);
+      // Rule: Adding a Joker to an existing set kills it
+      if (hasNewJoker) {
+        return { valid: true, sequenceIndex: i, newSequence: sorted.map(c => ({ ...c, isDead: true })) };
       }
-
-      return { valid: true, sequenceIndex: i, newSequence: sortSameValueCombo(combined) };
+      return { valid: true, sequenceIndex: i, newSequence: sorted };
     }
   }
   
@@ -418,6 +488,29 @@ export const extractSameValueCombo = (hand: Card[], minCount: number): { combo: 
   }
 
   return { combo: [], remainingHand: hand };
+};
+
+export const checkJackpotSong = (hand: Card[]): boolean => {
+  // Try to exhaust hand by extracting all possible sequences first
+  let { remainingHand } = extractAllSequences(hand);
+  
+  // Then greedily extract any same-value combos (sets of 3, 4, or 5)
+  let currentHand = [...remainingHand];
+  let found = true;
+  while (found && currentHand.length > 0) {
+    found = false;
+    // Check for sets of 5, 4, then 3
+    for (let size = 5; size >= 3; size--) {
+      const { combo, remainingHand: nextHand } = extractSameValueCombo(currentHand, size);
+      if (combo.length > 0) {
+        currentHand = nextHand;
+        found = true;
+        break;
+      }
+    }
+  }
+
+  return currentHand.length === 0;
 };
 
 export const calculateHandValue = (hand: Card[], isSongWin: boolean): number => {

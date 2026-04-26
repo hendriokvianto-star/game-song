@@ -1,5 +1,5 @@
 import { Card } from './types';
-import { isSequenceComplete } from './combinations';
+import { isSequenceComplete, isSameValueCombo, isDeadSet } from './combinations';
 
 const VALUE_TO_RANK: Record<number, string> = {
   2: '2', 3: '3', 4: '4', 5: '5', 6: '6', 7: '7',
@@ -15,6 +15,7 @@ export interface SequenceHint {
   canAddRight: string | null;
   suit: string;
   suitSymbol: string;
+  isSameValue?: boolean;
 }
 
 export function getSequenceHints(sequence: Card[]): SequenceHint {
@@ -27,6 +28,23 @@ export function getSequenceHints(sequence: Card[]): SequenceHint {
   const suit = regulars[0].suit;
   const suitSymbol = SUIT_SYMBOLS[suit] || '?';
   
+  // Rule: Dead Set (Set with Joker) cannot be extended
+  if (isDeadSet(sequence)) {
+    return { canAddLeft: null, canAddRight: null, suit, suitSymbol };
+  }
+
+  if (isSameValueCombo(sequence)) {
+    const val = regulars[0].value;
+    const rank = VALUE_TO_RANK[val] || `${val}`;
+    return { 
+      canAddLeft: `${rank} Any Suit`, 
+      canAddRight: null, 
+      suit: 'none', 
+      suitSymbol: '🃏',
+      isSameValue: true 
+    };
+  }
+
   if (isSequenceComplete(sequence)) {
     return { canAddLeft: null, canAddRight: null, suit, suitSymbol };
   }

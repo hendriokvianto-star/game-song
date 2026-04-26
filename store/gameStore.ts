@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Card, GameState, Player, Suit } from '../logic/types';
 import { Language } from '../logic/i18n';
 import { createDeck, shuffle, deal } from '../logic/game-engine';
-import { validatePlayMulti, extractAllSequences, extractSameValueCombo, isSequence, isSameValueCombo, calculateHandValue, calculateWinnerBonus } from '../logic/combinations';
+import { validatePlayMulti, validatePlayAt, extractAllSequences, extractSameValueCombo, isSequence, isSameValueCombo, calculateHandValue, calculateWinnerBonus, checkJackpotSong } from '../logic/combinations';
 import { AIBot } from '../logic/ai-engine';
 import * as Haptics from 'expo-haptics';
 
@@ -23,7 +23,7 @@ interface GameStore extends GameState {
   initializeGame: () => void;
   executeOpeningPhase: () => void;
   toggleCardSelection: (cardId: string) => void;
-  playSelectedCards: () => boolean;
+  playSelectedCards: (targetIndex?: number) => boolean;
   playDraggedCard: (cardId: string) => void;
   passTurn: () => void;
   executeAITurn: () => void;
@@ -217,14 +217,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
   executeOpeningPhase: () => {
     const state = get();
     if (state.status !== 'opening') return;
+    if (state.isRedealing) return; // Prevent concurrent redeal execution
 
     let newActiveSequences = [...state.activeSequences];
-    let newPlayers = [...state.players];
-    let newFinishCount = state.finishCount;
-
+    let jackpotWinnerId: string | undefined = undefined;
+    
     // 1. Process combinations (Sequences and 5-of-a-kind)
-    for (let i = 0; i < newPlayers.length; i++) {
-      const player = newPlayers[i];
+    const processedPlayers = state.players.map(player => {
       const { sequences } = extractAllSequences(player.hand);
       
       let hasValidOpening = sequences.length > 0;
@@ -238,24 +237,56 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       if (!hasValidOpening) {
-        // Mark for instant game over due to deadlock in opening
-        (newPlayers[i] as any).deadlockedInOpening = true;
+        return { ...player, deadlockedInOpening: true };
+      } else {
+        // Check for Jackpot Song (all 20 cards form valid combinations)
+        if (checkJackpotSong(player.hand)) {
+          jackpotWinnerId = player.id;
+        }
+        return { ...player, deadlockedInOpening: false };
       }
-      // If hasValidOpening is true, they keep their cards in hand.
+    });
+    const deadlockedCount = processedPlayers.filter(p => (p as any).deadlockedInOpening).length;
+    console.log("[Game] Deadlocked players count:", deadlockedCount);
+    
+    if (deadlockedCount >= 2) {
+      set({ 
+        lastPlayInfo: { playerName: 'SYSTEM', message: 'REDEAL: 2+ players deadlocked! Re-dealing...' },
+        status: 'dealing' as any,
+        isRedealing: true,
+        cardsDealt: 0,
+        players: state.players.map(p => ({ 
+          ...p, 
+          hand: [], 
+          deadlockedInOpening: false, 
+          finishedOrder: undefined, 
+          pointsGainedThisRound: undefined,
+          hasOpened: false,
+          openingValue: undefined
+        })),
+        activeSequences: [],
+        lastFinishingMeld: []
+      });
+      
+      setTimeout(() => {
+        set({ isRedealing: false });
+        const rawDeck = createDeck();
+        const shuffled = shuffle(rawDeck);
+        get().runDealAnimation(shuffled);
+      }, 1500);
+      return;
     }
 
     // 2. Handle Instant Game Overs (assigning them the worst ranks)
-    const losers = newPlayers.filter(p => (p as any).instantGameOver);
-    let currentBadRank = newPlayers.length; // 5 if 5 players
-
-    // Give worst ranks to all instant losers
-    for (let i = 0; i < newPlayers.length; i++) {
-      if ((newPlayers[i] as any).deadlockedInOpening) {
-        newPlayers[i].finishedOrder = currentBadRank;
-        currentBadRank--;
+    let newFinishCount = state.finishCount;
+    let currentBadRank = processedPlayers.length;
+    const newPlayers = processedPlayers.map(p => {
+      if ((p as any).deadlockedInOpening) {
         newFinishCount++;
+        return { ...p, finishedOrder: currentBadRank-- };
       }
-    }
+      return p;
+    });
 
     // 3. Determine if game ended immediately
     let newStatus = 'playing';
@@ -263,8 +294,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
     let finalWinnerIdForMatch = undefined;
     
     const survivingPlayers = newPlayers.filter(p => p.finishedOrder === undefined);
-    if (survivingPlayers.length <= 1) {
-      if (survivingPlayers.length === 1) {
+    if (survivingPlayers.length <= 1 || jackpotWinnerId) {
+      if (jackpotWinnerId) {
+        newWinnerId = jackpotWinnerId;
+        const winnerIdx = newPlayers.findIndex(p => p.id === jackpotWinnerId);
+        newPlayers[winnerIdx].finishedOrder = 1;
+        newFinishCount = 1;
+        set({ ceremonyWinnerId: newWinnerId });
+        get().triggerSFX('win');
+      } else if (survivingPlayers.length === 1) {
         newFinishCount++;
         const survivorIdx = newPlayers.findIndex(p => p.id === survivingPlayers[0].id);
         newPlayers[survivorIdx].finishedOrder = newFinishCount; // They get 1st place
@@ -278,7 +316,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       newPlayers.forEach((p, idx) => {
         let roundScore = 0;
         if (p.id === newWinnerId) {
-          roundScore = -50; // Standard win bonus for opening phase win
+          roundScore = jackpotWinnerId ? -250 : -50; // -250 for Jackpot, -50 for standard opening win
         } else if ((p as any).deadlockedInOpening) {
           roundScore = 100; // Deadlock in opening penalty
         } else {
@@ -328,22 +366,38 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  playSelectedCards: (): boolean => {
+  playSelectedCards: (targetIndex?: number): boolean => {
     const state = get();
     if (state.status !== 'playing' || state.players[state.currentPlayerIndex].isAI) return false;
 
     const currentPlayer = state.players[state.currentPlayerIndex];
-    // Preserve the exact order in which cards were selected!
     const selectedCards = state.selectedCardIds
       .map(id => currentPlayer.hand.find(c => c.id === id))
       .filter((c): c is Card => c !== undefined);
 
     if (selectedCards.length === 0) return false;
 
-    const { valid, sequenceIndex, newSequence } = validatePlayMulti(selectedCards, state.activeSequences);
+    let valid = false;
+    let sequenceIndex = -1;
+    let newSequence: Card[] = [];
+
+    if (targetIndex !== undefined && typeof targetIndex === 'number') {
+      const res = validatePlayAt(selectedCards, state.activeSequences, targetIndex);
+      valid = res.valid;
+      sequenceIndex = targetIndex;
+      newSequence = res.newSequence;
+    } else {
+      const res = validatePlayMulti(selectedCards, state.activeSequences);
+      valid = res.valid;
+      sequenceIndex = res.sequenceIndex;
+      newSequence = res.newSequence;
+    }
+
     if (!valid) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      alert("Invalid play! Must start a new sequence of 3+ cards, or extend an existing sequence on the table.");
+      alert(targetIndex !== undefined 
+        ? "Kartu pilihan tidak cocok untuk seri ini!"
+        : "Langkah tidak valid! Harus membuat seri baru (3+ kartu) atau menempel pada seri yang sudah ada.");
       return false;
     }
 

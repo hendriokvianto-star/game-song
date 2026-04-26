@@ -76,7 +76,7 @@ function RulesScreen({ onClose }: { onClose: () => void }) {
 function GameOverScreen() {
   const { 
     players, winnerId, restartGame, nextRound, 
-    currentRound, matchWinnerId, lastFinishingMeld 
+    currentRound, matchWinnerId, lastFinishingMeld, deck, language 
   } = useGameStore();
 
   const isMatchOver = matchWinnerId !== undefined;
@@ -157,6 +157,21 @@ function GameOverScreen() {
               </Animated.View>
             ))}
           </View>
+
+          {deck.length > 0 && (
+            <View style={styles.leftoverCardsSection}>
+              <Text style={styles.leftoverCardsTitle}>
+                {language === 'id' ? 'KARTU SISA' : 'LEFTOVER CARDS'} ({deck.length})
+              </Text>
+              <View style={styles.leftoverCardsRow}>
+                {deck.map((c, i) => (
+                  <View key={c.id} style={styles.leftoverCardWrapper}>
+                    <CardComponent card={c} isFaceUp compact />
+                  </View>
+                ))}
+              </View>
+            </View>
+          )}
         </ScrollView>
 
         <View style={styles.gameOverActions}>
@@ -202,7 +217,9 @@ function WinCeremony() {
         <Animated.Text entering={FadeInUp.delay(300)} style={styles.ceremonyEmoji}>👑</Animated.Text>
         <Animated.Text entering={FadeInDown.delay(500)} style={styles.ceremonyTitle}>{t.winner}</Animated.Text>
         <Animated.Text entering={FadeIn.delay(800)} style={styles.ceremonyName}>{winner.id === 'p1' ? t.you.toUpperCase() : winner.name.toUpperCase()}</Animated.Text>
-        <Animated.Text entering={FadeInUp.delay(1000)} style={styles.ceremonySubtitle}>Kartu telah habis!</Animated.Text>
+        <Animated.Text entering={FadeInUp.delay(1000)} style={[styles.ceremonySubtitle, winner.pointsGainedThisRound === -250 && { color: '#f1c40f', fontWeight: '900', fontSize: 24 }]}>
+          {winner.pointsGainedThisRound === -250 ? 'JACKPOT! 🎰' : 'Kartu telah habis!'}
+        </Animated.Text>
         
         <View style={styles.particleContainer}>
           {['✨', '🎉', '🌟', '🃏', '🔥'].map((emoji, i) => (
@@ -240,12 +257,14 @@ function TutorialOverlay() {
 
   // Positioning logic for highlights (approximated)
   let highlightStyle: any = {};
-  if (tutorialStep === 1) highlightStyle = { top: 60, height: 100, width: '100%' };
-  if (tutorialStep === 2) highlightStyle = { top: 160, height: height * 0.35, width: '100%' };
-  if (tutorialStep === 3) highlightStyle = { bottom: 100, height: 150, width: '100%' };
-  if (tutorialStep === 4) highlightStyle = { bottom: 20, left: 20, width: 80, height: 60 };
-  if (tutorialStep === 5) highlightStyle = { bottom: 20, left: 110, width: 80, height: 60 };
-  if (tutorialStep === 6) highlightStyle = { bottom: 20, right: 20, width: 120, height: 60 };
+  if (tutorialStep === 1) highlightStyle = { top: 60, height: 110, width: '100%', borderRadius: 12 };
+  if (tutorialStep === 2) highlightStyle = { top: 180, height: height * 0.35, width: '100%', borderRadius: 12 };
+  if (tutorialStep === 3) highlightStyle = { bottom: 100, height: 160, width: '100%', borderRadius: 12 };
+  if (tutorialStep === 4) highlightStyle = { bottom: 15, left: 15, width: 90, height: 70, borderRadius: 12 };
+  if (tutorialStep === 5) highlightStyle = { bottom: 15, left: 115, width: 90, height: 70, borderRadius: 12 };
+  if (tutorialStep === 6) highlightStyle = { bottom: 15, right: 15, width: 130, height: 70, borderRadius: 12 };
+
+  const totalSteps = t.tutorialSteps.length;
 
   return (
     <View style={styles.tutorialOverlay}>
@@ -253,30 +272,41 @@ function TutorialOverlay() {
       
       {tutorialStep > 0 && (
         <Animated.View 
-          entering={FadeIn} 
+          entering={FadeIn.duration(400)} 
+          layout={LinearTransition}
           style={[styles.tutorialHighlight, highlightStyle]} 
-        />
+        >
+          <View style={styles.highlightPulse} />
+        </Animated.View>
       )}
 
       <Animated.View 
         entering={FadeInDown} 
+        layout={LinearTransition}
         style={[
           styles.tutorialBox,
-          tutorialStep === 1 ? { top: 180 } : 
-          tutorialStep === 2 ? { top: 220 } : 
-          tutorialStep >= 3 ? { bottom: 200 } : { top: '35%' }
+          tutorialStep === 1 ? { top: 190 } : 
+          tutorialStep === 2 ? { top: 20 } : 
+          tutorialStep >= 3 && tutorialStep <= 6 ? { bottom: 200 } : { top: '35%' }
         ]}
       >
+        <View style={styles.tutorialHeader}>
+          <Text style={styles.tutorialStepCount}>{language === 'id' ? 'Langkah' : 'Step'} {tutorialStep + 1} / {totalSteps}</Text>
+          <Pressable onPress={closeTutorial} style={styles.tutorialCloseMini}>
+            <Text style={{color: '#95a5a6', fontSize: 18}}>✕</Text>
+          </Pressable>
+        </View>
+
         <Text style={styles.tutorialTitle}>{currentStep.title}</Text>
         <Text style={styles.tutorialDesc}>{currentStep.desc}</Text>
         
         <View style={styles.tutorialFooter}>
-          <Pressable onPress={closeTutorial}>
-            <Text style={styles.tutorialSkip}>{t.exit}</Text>
+          <Pressable onPress={closeTutorial} style={styles.tutorialSkipBtn}>
+            <Text style={styles.tutorialSkipText}>{language === 'id' ? 'Lewati' : 'Skip'}</Text>
           </Pressable>
-          <Pressable style={styles.tutorialNext} onPress={nextTutorialStep}>
+          <Pressable style={styles.tutorialNextBtn} onPress={nextTutorialStep}>
             <Text style={styles.tutorialNextText}>
-              {tutorialStep === t.tutorialSteps.length - 1 ? t.finish : t.next}
+              {tutorialStep === totalSteps - 1 ? t.finish : t.next}
             </Text>
           </Pressable>
         </View>
@@ -432,12 +462,16 @@ function RemainingDeck() {
 }
 
 function TableSequences() {
-  const { activeSequences, language } = useGameStore();
+  const { activeSequences, language, selectedCardIds, playSelectedCards } = useGameStore();
   const t = translations[language];
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
 
-  const toggleHint = (idx: number) => {
-    setExpandedIdx(prev => (prev === idx ? null : idx));
+  const onSequencePress = (idx: number) => {
+    if (selectedCardIds.length > 0) {
+      playSelectedCards(idx);
+    } else {
+      setExpandedIdx(prev => (prev === idx ? null : idx));
+    }
   };
 
   useEffect(() => {
@@ -458,10 +492,17 @@ function TableSequences() {
           const isExpanded = expandedIdx === sIdx;
 
           return (
-            <Pressable key={sIdx} onPress={() => toggleHint(sIdx)}>
-              <View style={[styles.sequenceRow, isExpanded && styles.sequenceRowExpanded]}>
+            <Pressable key={sIdx} onPress={() => onSequencePress(sIdx)}>
+              <View style={[
+                styles.sequenceRow, 
+                isExpanded && styles.sequenceRowExpanded,
+                selectedCardIds.length > 0 && styles.sequenceRowTargetable
+              ]}>
                 <View style={styles.sequenceBadge}>
                   <Text style={styles.sequenceBadgeText}>Seq {sIdx + 1}</Text>
+                  {selectedCardIds.length > 0 && (
+                    <Text style={{ fontSize: 7, color: '#3498db', fontWeight: 'bold', marginTop: 2 }}>TAP UNTUK MENEMPEL</Text>
+                  )}
                   {seq.some(c => c.isDead) && (
                     <View style={styles.deadLabel}>
                       <Text style={styles.deadLabelText}>MATI</Text>
@@ -581,7 +622,7 @@ function GameLogSidebar({ onClose }: { onClose: () => void }) {
 
 export default function GameBoard() {
   const [showRules, setShowRules] = useState(false);
-  const [showLog, setShowLog] = useState(true);
+  const [showLog, setShowLog] = useState(false);
   const {
     players, status, currentPlayerIndex, initializeGame,
     playSelectedCards, passTurn, activeSequences, executeAITurn,
@@ -598,7 +639,6 @@ export default function GameBoard() {
     let localSound: Audio.Sound | undefined = undefined;
     async function playBGM() {
       try {
-        /*
         const { sound } = await Audio.Sound.createAsync(
           require('../assets/sounds/bgm.mp3'),
           { isLooping: true, volume: 0.3 }
@@ -606,13 +646,11 @@ export default function GameBoard() {
         localSound = sound;
         setSound(sound);
         await sound.playAsync();
-        */
-        console.log('BGM logic ready (bgm.mp3 missing)');
       } catch (e) {
         console.log('Error playing BGM:', e);
       }
     }
-    // playBGM(); // Disabled until asset exists
+    playBGM();
 
     // Hide status bar on mobile to maximize screen
     if (Platform.OS !== 'web') {
@@ -870,7 +908,7 @@ export default function GameBoard() {
 
                 <Pressable
                   style={[styles.actionBtn, styles.playBtnStyle, (!isHumanTurn || !hasSelection || status === 'dealing') && styles.actionBtnDisabled]}
-                  onPress={playSelectedCards}
+                  onPress={() => playSelectedCards()}
                   disabled={!isHumanTurn || !hasSelection || status === 'dealing'}
                 >
                   <Text style={styles.actionBtnText}>
@@ -913,14 +951,18 @@ const styles = StyleSheet.create({
   mainRow: { flex: 1, flexDirection: 'row' },
   mainContent: { flex: 1, flexDirection: 'column' },
   logSidebar: {
+    position: isLandscapeMobile ? 'relative' : 'absolute',
+    right: 0,
+    top: 0,
+    bottom: 0,
     width: isLandscapeMobile ? 200 : 280,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+    backgroundColor: 'rgba(0,0,0,0.92)',
     borderLeftWidth: 1,
     borderLeftColor: 'rgba(255,255,255,0.1)',
     display: 'flex',
     flexDirection: 'column',
     paddingTop: Platform.OS === 'ios' ? 50 : 30,
-    zIndex: 500,
+    zIndex: 1000,
   },
   logSidebarHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.1)' },
   logSidebarTitle: { color: '#E8D9B0', fontSize: 16, fontWeight: 'bold' },
@@ -969,7 +1011,13 @@ const styles = StyleSheet.create({
   tableContainer: { flex: 1, padding: 4 },
   sequencesWrapContainer: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, justifyContent: 'center', alignItems: 'flex-start' },
   sequenceRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
-  sequenceRowExpanded: { backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 8, padding: 4 },
+  sequenceRowExpanded: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 12 },
+  sequenceRowTargetable: { 
+    borderColor: '#3498db', 
+    borderWidth: 2, 
+    borderStyle: 'dashed',
+    backgroundColor: 'rgba(52,152,219,0.1)'
+  },
   sequenceBadge: { backgroundColor: 'rgba(46,204,113,0.15)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 6, minWidth: 44, alignItems: 'center' },
   sequenceBadgeText: { fontSize: 9, color: '#2ecc71', fontWeight: '600' },
   sequenceCards: { flexDirection: 'row', paddingVertical: 2, paddingRight: 4 },
@@ -1077,20 +1125,43 @@ const styles = StyleSheet.create({
     left: 20,
     right: 20,
     backgroundColor: '#fff',
-    borderRadius: 16,
-    padding: 20,
+    borderRadius: 28,
+    padding: 28,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.3,
-    shadowRadius: 20,
-    elevation: 10,
+    shadowOffset: { width: 0, height: 25 },
+    shadowOpacity: 0.25,
+    shadowRadius: 40,
+    elevation: 30,
+    borderWidth: 1.5,
+    borderColor: 'rgba(52,152,219,0.15)',
   },
-  tutorialTitle: { fontSize: 20, fontWeight: 'bold', color: '#2c3e50', marginBottom: 8 },
-  tutorialDesc: { fontSize: 16, color: '#34495e', lineHeight: 22, marginBottom: 20 },
+  tutorialHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
+  tutorialStepCount: { color: '#3498db', fontWeight: '900', fontSize: 13, textTransform: 'uppercase', letterSpacing: 1.5 },
+  tutorialCloseMini: { padding: 6 },
+  tutorialTitle: { fontSize: 26, fontWeight: '900', color: '#2c3e50', marginBottom: 12, letterSpacing: -0.5 },
+  tutorialDesc: { fontSize: 16, color: '#576574', lineHeight: 26, marginBottom: 28 },
   tutorialFooter: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  tutorialSkip: { color: '#95a5a6', fontWeight: '600' },
-  tutorialNext: { backgroundColor: '#2ecc71', paddingHorizontal: 24, paddingVertical: 10, borderRadius: 12 },
-  tutorialNextText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+  tutorialSkipBtn: { paddingVertical: 12, paddingHorizontal: 16 },
+  tutorialSkipText: { color: '#95a5a6', fontWeight: 'bold', fontSize: 14 },
+  tutorialNextBtn: { 
+    backgroundColor: '#3498db', 
+    paddingHorizontal: 32, 
+    paddingVertical: 14, 
+    borderRadius: 16,
+    shadowColor: '#3498db',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  tutorialNextText: { color: '#fff', fontWeight: '900', fontSize: 16 },
+  highlightPulse: {
+    ...StyleSheet.absoluteFillObject,
+    borderWidth: 3,
+    borderColor: '#f1c40f',
+    borderRadius: 12,
+    opacity: 0.5,
+  },
   ceremonyOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.9)',

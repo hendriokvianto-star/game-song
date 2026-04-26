@@ -12,7 +12,6 @@ import { Dimensions } from 'react-native';
 const { width, height } = Dimensions.get('window');
 const isLandscapeMobile = width > height && width < 1024;
 
-const CARD_SLOT = 44;
 
 interface HandProps {
   cards: CardType[];
@@ -20,7 +19,7 @@ interface HandProps {
 }
 
 function DraggableCard({
-  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted
+  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted, spacing
 }: {
   card: CardType;
   index: number;
@@ -32,6 +31,7 @@ function DraggableCard({
   isFaceUp: boolean;
   selectionIndex?: number;
   isHighlighted?: boolean;
+  spacing: number;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -52,7 +52,7 @@ function DraggableCard({
       if (translateY.value < -80) {
         runOnJS(doPlayDrag)();
       } else {
-        const moved = Math.round(translateX.value / CARD_SLOT);
+        const moved = Math.round(translateX.value / spacing);
         if (moved !== 0) {
           const target = Math.max(0, Math.min(totalCards - 1, index + moved));
           if (target !== index) runOnJS(doReorder)(index, target);
@@ -136,6 +136,7 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
                 isFaceUp={status !== 'dealing'}
                 selectionIndex={selectionIndex}
                 isHighlighted={currentHint?.cardIds.includes(card.id)}
+                spacing={finalSpacing}
               />
             </View>
           );

@@ -38,4 +38,5 @@ export interface GameState {
   lastFinishingMeld?: Card[]; // The cards that ended the round
   matchWinnerId?: string; // Winner of the 500-point match
   ceremonyWinnerId?: string; // Player triggering the ceremonial win
+  isRedealing?: boolean;
 }
