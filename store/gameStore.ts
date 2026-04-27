@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { Card, GameState, Player, Suit } from '../logic/types';
-import { Language } from '../logic/i18n';
+import { Language, translations } from '../logic/i18n';
 import { createDeck, shuffle, deal } from '../logic/game-engine';
 import { validatePlayMulti, validatePlayAt, extractAllSequences, extractSameValueCombo, isSequence, isSameValueCombo, calculateHandValue, calculateWinnerBonus, checkJackpotSong } from '../logic/combinations';
 import { AIBot } from '../logic/ai-engine';
@@ -18,13 +18,14 @@ interface GameStore extends GameState {
   sfxTrigger: { type: 'draw' | 'play' | 'win' | 'mati' | 'deal', timestamp: number } | null;
   language: Language;
   tutorialStep: number | null;
+  dialogConfig: { title: string; message: string; actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }[] } | null;
 
   // Actions
   initializeGame: () => void;
   executeOpeningPhase: () => void;
   toggleCardSelection: (cardId: string) => void;
   playSelectedCards: (targetIndex?: number) => boolean;
-  playDraggedCard: (cardId: string) => void;
+  playDraggedCard: (cardId: string) => boolean;
   passTurn: () => void;
   executeAITurn: () => void;
   restartGame: () => void;
@@ -40,7 +41,10 @@ interface GameStore extends GameState {
   setLanguage: (lang: Language) => void;
   startTutorial: () => void;
   nextTutorialStep: () => void;
+  skipDeal: () => void;
   closeTutorial: () => void;
+  showDialog: (title: string, message: string, actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }[]) => void;
+  hideDialog: () => void;
 }
 
 const getNextActivePlayer = (currentIndex: number, direction: number, players: Player[]): number => {
@@ -56,6 +60,50 @@ const getNextActivePlayer = (currentIndex: number, direction: number, players: P
 
 const countActivePlayers = (players: Player[]): number => {
   return players.filter(p => p.finishedOrder === undefined).length;
+};
+
+// Extracted helper: resolve game end scoring (was duplicated 3x)
+const resolveGameEnd = (
+  newPlayers: Player[],
+  winnerId: string | undefined,
+  lastFinishingMeld: Card[],
+  isAttachment: boolean
+): { updatedPlayers: Player[], matchWinnerId: string | undefined } => {
+  const winnerBonus = winnerId ? calculateWinnerBonus(lastFinishingMeld, isAttachment) : 0;
+  let finalWinnerIdForMatch: string | undefined = undefined;
+
+  // Assign remaining ranks by fewest cards
+  let finishCount = newPlayers.filter(p => p.finishedOrder !== undefined).length;
+  const remaining = newPlayers
+    .map((p, idx) => ({ p, idx }))
+    .filter(({ p }) => p.finishedOrder === undefined)
+    .sort((a, b) => a.p.hand.length - b.p.hand.length);
+
+  remaining.forEach(({ p, idx }) => {
+    finishCount++;
+    newPlayers[idx] = { ...newPlayers[idx], finishedOrder: finishCount };
+  });
+
+  // Calculate scores
+  newPlayers.forEach((p, idx) => {
+    let roundScore = 0;
+    if (winnerId && p.id === winnerId) {
+      roundScore = winnerBonus;
+    } else if (p.deadlockedInOpening) {
+      roundScore = 100;
+    } else {
+      roundScore = calculateHandValue(p.hand, !!winnerId);
+    }
+    const newTotalScore = p.totalScore + roundScore;
+    newPlayers[idx] = { ...newPlayers[idx], pointsGainedThisRound: roundScore, totalScore: newTotalScore };
+
+    if (newTotalScore >= 500 && !finalWinnerIdForMatch) {
+      const sortedByTotal = [...newPlayers].sort((a, b) => a.totalScore - b.totalScore);
+      finalWinnerIdForMatch = sortedByTotal[0].id;
+    }
+  });
+
+  return { updatedPlayers: newPlayers, matchWinnerId: finalWinnerIdForMatch };
 };
 
 const determineNextTurn = (state: GameState, newPlayers: Player[], newStatus: GameState['status']): { nextPlayerIndex: number, newAllPlayersOpened: boolean } => {
@@ -106,11 +154,14 @@ export const useGameStore = create<GameStore>((set, get) => ({
   sfxTrigger: null,
   language: 'id',
   tutorialStep: null,
+  dialogConfig: null,
 
   allPlayersOpened: false,
   currentRound: 1,
   lastFinishingMeld: [],
   matchWinnerId: undefined,
+
+  // t is computed in components via: const t = translations[language];
 
   initializeGame: () => {
     const rawDeck = createDeck();
@@ -191,7 +242,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       }
 
       if (currentDealIndex < totalToDeal) {
-        setTimeout(dealNextCard, 140); // 140ms per card = 14 seconds total
+        setTimeout(dealNextCard, 60); // 60ms per card = ~6 seconds total
       } else {
         // Sort human player's hand for convenience
         const finalPlayers = [...newPlayers];
@@ -395,9 +446,10 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (!valid) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const t = translations[get().language];
       alert(targetIndex !== undefined 
-        ? "Kartu pilihan tidak cocok untuk seri ini!"
-        : "Langkah tidak valid! Harus membuat seri baru (3+ kartu) atau menempel pada seri yang sudah ada.");
+        ? t.cardNotMatch
+        : t.invalidMove);
       return false;
     }
 
@@ -405,7 +457,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!currentPlayer.hasOpened) {
       if (sequenceIndex !== -1) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        alert("Anda harus meletakkan seri atau 5-Kembar terlebih dahulu sebelum bisa menempel kartu!");
+        alert(translations[get().language].mustOpenFirst);
         return false;
       }
       
@@ -415,7 +467,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       
       if (isSet && !isSeq && selectedCards.length < 5) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-        alert("Untuk pembukaan pertama, angka kembar (set) harus berjumlah minimal 5 kartu!");
+        alert(translations[get().language].setMinFive);
         return false;
       }
     }
@@ -458,42 +510,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
       // Game over immediately!
       newStatus = 'finished';
 
-      // Assign remaining ranks based on fewest cards left
-      const remainingPlayers = newPlayers
-        .filter(p => p.finishedOrder === undefined)
-        .sort((a, b) => a.hand.length - b.hand.length);
-      
-      remainingPlayers.forEach(p => {
-        newFinishCount++;
-        const idx = newPlayers.findIndex(x => x.id === p.id);
-        newPlayers[idx] = { ...p, finishedOrder: newFinishCount };
-      });
-
-      // Calculate Scores
-      const winnerBonus = calculateWinnerBonus(lastFinishingMeld, sequenceIndex !== -1);
-      let finalWinnerIdForMatch = undefined;
-
-      newPlayers.forEach((p, idx) => {
-        let roundScore = 0;
-        if (p.id === newWinnerId) {
-          roundScore = winnerBonus;
-        } else {
-          roundScore = calculateHandValue(p.hand, true);
-        }
-        
-        const newTotalScore = p.totalScore + roundScore;
-        newPlayers[idx] = { 
-          ...p, 
-          pointsGainedThisRound: roundScore, 
-          totalScore: newTotalScore 
-        };
-
-        if (newTotalScore >= 500) {
-          // Match is over! Find the one with lowest total score
-          const sortedByTotal = [...newPlayers].sort((a, b) => a.totalScore - b.totalScore);
-          finalWinnerIdForMatch = sortedByTotal[0].id;
-        }
-      });
+      // Use shared scoring helper
+      const { updatedPlayers: scoredPlayers, matchWinnerId: finalWinnerIdForMatch } = resolveGameEnd(
+        newPlayers, newWinnerId, lastFinishingMeld, sequenceIndex !== -1
+      );
+      newPlayers.splice(0, newPlayers.length, ...scoredPlayers);
 
       set({
         lastFinishingMeld,
@@ -505,7 +526,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const formatSuit = (s: string) => s === 'none' ? '' : s;
       const cardNames = selectedCards.map(c => c.isJoker ? 'Joker' : `${c.rank} ${formatSuit(c.suit)}`).join(', ');
-      const actionMessage = sequenceIndex === -1 ? `membuka seri baru dengan ${cardNames}` : `menempelkan ${cardNames} di Seq ${sequenceIndex + 1}`;
+      const t = translations[get().language];
+      const actionMessage = sequenceIndex === -1 ? `${t.newSequenceWith} ${cardNames}` : `${t.attachedTo} ${cardNames} ${t.inSeq} ${sequenceIndex + 1}`;
 
       set({
         players: newPlayers,
@@ -526,7 +548,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   playDraggedCard: (cardId: string) => {
     const state = get();
-    if (state.status !== 'playing' || state.players[state.currentPlayerIndex].isAI) return;
+    if (state.status !== 'playing' || state.players[state.currentPlayerIndex].isAI) return false;
 
     const wasSelected = state.selectedCardIds.includes(cardId);
     const originalSelection = [...state.selectedCardIds];
@@ -540,6 +562,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     if (!success && !wasSelected) {
       set({ selectedCardIds: originalSelection });
     }
+    return success;
   },
 
   passTurn: () => {
@@ -580,35 +603,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         newWinnerId = undefined;
       }
 
-      // Calculate Scores for the round
-      const lastFinishingMeld = state.lastFinishingMeld; 
-      // If we have a real winnerId (from someone finishing), use the bonus.
-      // Otherwise (total deadlock), winnerBonus is 0.
-      const winnerBonus = newWinnerId ? calculateWinnerBonus(lastFinishingMeld || [], false) : 0; 
-      
-      let finalWinnerIdForMatch = undefined;
-      newPlayers.forEach((p, idx) => {
-        let roundScore = 0;
-        if (newWinnerId && p.id === newWinnerId) {
-          roundScore = winnerBonus;
-        } else if ((p as any).deadlockedInOpening) {
-          roundScore = 100;
-        } else {
-          roundScore = calculateHandValue(p.hand, !!newWinnerId);
-        }
-        
-        const newTotalScore = p.totalScore + roundScore;
-        newPlayers[idx] = { 
-          ...newPlayers[idx], 
-          pointsGainedThisRound: roundScore, 
-          totalScore: newTotalScore 
-        };
-
-        if (newTotalScore >= 500) {
-          const sortedByTotal = [...newPlayers].sort((a, b) => a.totalScore - b.totalScore);
-          finalWinnerIdForMatch = sortedByTotal[0].id;
-        }
-      });
+      // Use shared scoring helper
+      const { updatedPlayers: scoredPlayers, matchWinnerId: finalWinnerIdForMatch } = resolveGameEnd(
+        newPlayers, newWinnerId, state.lastFinishingMeld || [], false
+      );
+      newPlayers.splice(0, newPlayers.length, ...scoredPlayers);
       
       set({ matchWinnerId: finalWinnerIdForMatch });
     }
@@ -620,8 +619,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentPlayerIndex: nextPlayerIndex,
       status: newStatus,
       winnerId: newWinnerId,
-      lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} tereliminasi karena tidak bisa jalan!` },
-      playHistory: [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} tereliminasi karena tidak bisa jalan!`, timestamp: Date.now() }, ...state.playHistory],
+      lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} ${translations[get().language].eliminated}` },
+      playHistory: [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${translations[get().language].eliminated}`, timestamp: Date.now() }, ...state.playHistory],
       selectedCardIds: [],
       allPlayersOpened: newAllPlayersOpened,
     });
@@ -675,41 +674,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
         // Game over immediately!
         newStatus = 'finished';
 
-        // Assign remaining ranks based on fewest cards left
-        const remainingPlayers = newPlayers
-          .filter(p => p.finishedOrder === undefined)
-          .sort((a, b) => a.hand.length - b.hand.length);
-        
-        remainingPlayers.forEach(p => {
-          newFinishCount++;
-          const idx = newPlayers.findIndex(x => x.id === p.id);
-          newPlayers[idx] = { ...p, finishedOrder: newFinishCount };
-        });
-
-        // Calculate Scores
-        const winnerBonus = calculateWinnerBonus(lastFinishingMeld, sequenceIndex !== -1);
-        let finalWinnerIdForMatch = undefined;
-
-        newPlayers.forEach((p, idx) => {
-          let roundScore = 0;
-          if (p.id === newWinnerId) {
-            roundScore = winnerBonus;
-          } else {
-            roundScore = calculateHandValue(p.hand);
-          }
-          
-          const newTotalScore = p.totalScore + roundScore;
-          newPlayers[idx] = { 
-            ...p, 
-            pointsGainedThisRound: roundScore, 
-            totalScore: newTotalScore 
-          };
-
-          if (newTotalScore >= 500) {
-            const sortedByTotal = [...newPlayers].sort((a, b) => a.totalScore - b.totalScore);
-            finalWinnerIdForMatch = sortedByTotal[0].id;
-          }
-        });
+        // Use shared scoring helper
+        const { updatedPlayers: scoredPlayers, matchWinnerId: finalWinnerIdForMatch } = resolveGameEnd(
+          newPlayers, newWinnerId, lastFinishingMeld, sequenceIndex !== -1
+        );
+        newPlayers.splice(0, newPlayers.length, ...scoredPlayers);
 
         set({
           lastFinishingMeld,
@@ -721,7 +690,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const formatSuit = (s: string) => s === 'none' ? '' : s;
       const cardNames = cardsToPlay.map(c => c.isJoker ? 'Joker' : `${c.rank} ${formatSuit(c.suit)}`).join(', ');
-      const actionMessage = sequenceIndex === -1 ? `membuka seri baru dengan ${cardNames}` : `menempelkan ${cardNames} di Seq ${sequenceIndex + 1}`;
+      const t = translations[get().language];
+      const actionMessage = sequenceIndex === -1 ? `${t.newSequenceWith} ${cardNames}` : `${t.attachedTo} ${cardNames} ${t.inSeq} ${sequenceIndex + 1}`;
 
       set({
         players: newPlayers,
@@ -815,20 +785,29 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const { cardsToPlay, sequenceIndex } = AIBot.getBestPlayMulti(currentPlayer.hand, state.activeSequences, !!currentPlayer.hasOpened, 'expert');
     
     if (cardsToPlay.length > 0) {
+      const t = translations[get().language];
       let msg = "";
       if (sequenceIndex === -1) {
-        msg = "💡 Kamu bisa membuka kombinasi baru!";
+        msg = t.hintNewCombo;
       } else {
-        msg = `💡 Kamu bisa menempelkan kartu di Seq ${sequenceIndex + 1}!`;
+        msg = `${t.hintAttach} ${sequenceIndex + 1}!`;
       }
       set({ currentHint: { message: msg, cardIds: cardsToPlay.map(c => c.id) } });
     } else {
-      set({ currentHint: { message: "❌ Kamu sedang Deadlock. Kartu di tangan tidak bisa jalan.", cardIds: [] } });
+      set({ currentHint: { message: translations[get().language].hintDeadlock, cardIds: [] } });
     }
   },
 
   clearHint: () => {
     set({ currentHint: null });
+  },
+
+  showDialog: (title, message, actions) => {
+    set({ dialogConfig: { title, message, actions } });
+  },
+
+  hideDialog: () => {
+    set({ dialogConfig: null });
   },
 
   setTheme: (theme) => {
@@ -846,11 +825,11 @@ export const useGameStore = create<GameStore>((set, get) => ({
   startTutorial: () => {
     // Initialize mock players so the board has something to show
     const mockPlayers: Player[] = [
-      { id: 'p1', name: 'You', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: false, totalScore: 0 },
-      { id: 'p2', name: 'Bot 1', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
-      { id: 'p3', name: 'Bot 2', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
-      { id: 'p4', name: 'Bot 3', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
-      { id: 'p5', name: 'Bot 4', hand: Array(20).fill({ id: 'm', suit: 'hearts', rank: 'A', value: 14 }), isAI: true, totalScore: 0 },
+      { id: 'p1', name: 'You', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m1-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: false, totalScore: 0 },
+      { id: 'p2', name: 'Bot 1', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m2-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
+      { id: 'p3', name: 'Bot 2', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m3-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
+      { id: 'p4', name: 'Bot 3', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m4-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
+      { id: 'p5', name: 'Bot 4', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m5-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
     ];
     set({ 
       tutorialStep: 0,
@@ -867,5 +846,44 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   closeTutorial: () => {
     set({ tutorialStep: null });
+  },
+
+  skipDeal: () => {
+    const state = get();
+    if (state.status !== 'dealing') return;
+    
+    // Instantly deal all remaining cards
+    const totalToDeal = 5 * 20;
+    const alreadyDealt = state.players.reduce((sum, p) => sum + p.hand.length, 0);
+    if (alreadyDealt >= totalToDeal) return;
+    
+    const deckCopy = [...state.deck];
+    const newPlayers = state.players.map(p => ({ ...p, hand: [...p.hand] }));
+    
+    for (let i = alreadyDealt; i < totalToDeal; i++) {
+      const playerIndex = i % 5;
+      const card = deckCopy.pop();
+      if (card) newPlayers[playerIndex].hand.push(card);
+    }
+    
+    // Sort human hand
+    const humanIdx = newPlayers.findIndex(p => !p.isAI);
+    if (humanIdx !== -1) {
+      newPlayers[humanIdx].hand.sort((a, b) => {
+        if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+        return a.value - b.value;
+      });
+    }
+    
+    set({ 
+      deck: deckCopy, 
+      players: newPlayers, 
+      cardsDealt: totalToDeal,
+      status: 'opening' 
+    });
+    
+    setTimeout(() => {
+      get().executeOpeningPhase();
+    }, 500);
   },
 }));

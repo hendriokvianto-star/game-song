@@ -1,12 +1,14 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, Platform } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, Dimensions } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { Card as CardType } from '../logic/types';
-import { Dimensions } from 'react-native';
 
-const { width, height } = Dimensions.get('window');
-const isLandscapeMobile = width > height && width < 1024;
+// Called at render time (not module scope) so it picks up current dimensions
+const getIsLandscape = () => {
+  const { width, height } = Dimensions.get('window');
+  return width > height && width < 1024;
+};
 
 interface CardProps {
   card: CardType;
@@ -52,7 +54,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
 
   let cardW = compact ? 44 : 60;
   let cardH = compact ? 66 : 90;
-  if (!compact && isLandscapeMobile) {
+  if (!compact && getIsLandscape()) {
     cardW = 50;
     cardH = 75;
   }
@@ -87,16 +89,26 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
 
   return (
     <Pressable onPress={handlePress}>
-      <Animated.View style={[styles.card, animatedStyle, isSelected && styles.selected, isHighlighted && styles.highlighted, { width: cardW, height: cardH }]}>
-        <View style={styles.cardCorner}>
-          <Text style={[styles.rank, { color: getColor() }]}>{card.rank}</Text>
-          <Text style={[styles.suitSmall, { color: getColor() }]}>{getSuitSymbol()}</Text>
+      <Animated.View style={[
+        styles.card, 
+        animatedStyle, 
+        isSelected && styles.selected, 
+        isHighlighted && styles.highlighted,
+        card.isDead && styles.deadCard,
+        { width: cardW, height: cardH }
+      ]}>
+        <View style={[styles.cardCorner, card.isDead && styles.deadContent]}>
+          <Text style={[styles.rank, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{card.rank}</Text>
+          <Text style={[styles.suitSmall, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
         </View>
-        <Text style={[styles.suitCenter, { color: getColor() }]}>{getSuitSymbol()}</Text>
+        <Text style={[styles.suitCenter, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
         {isSelected && selectionIndex !== undefined && (
           <View style={styles.selectionBadge}>
             <Text style={styles.selectionBadgeText}>{selectionIndex}</Text>
           </View>
+        )}
+        {card.isDead && (
+          <View style={styles.deadOverlay} />
         )}
       </Animated.View>
     </Pressable>
@@ -211,5 +223,17 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: 10,
     fontWeight: 'bold',
+  },
+  deadCard: {
+    backgroundColor: '#ecf0f1',
+    borderColor: '#bdc3c7',
+  },
+  deadContent: {
+    opacity: 0.5,
+  },
+  deadOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    borderRadius: 8,
   },
 });

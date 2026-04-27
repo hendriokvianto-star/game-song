@@ -1,16 +1,12 @@
 import React, { useCallback } from 'react';
-import { View, StyleSheet, ScrollView } from 'react-native';
+import { View, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, runOnJS, FadeInDown, LinearTransition
+  useSharedValue, useAnimatedStyle, withSpring, runOnJS, FadeInDown, LinearTransition, withSequence, withTiming
 } from 'react-native-reanimated';
 import { Card as CardType } from '../logic/types';
 import { CardComponent } from './Card';
 import { useGameStore } from '../store/gameStore';
-import { Dimensions } from 'react-native';
-
-const { width, height } = Dimensions.get('window');
-const isLandscapeMobile = width > height && width < 1024;
 
 
 interface HandProps {
@@ -27,7 +23,7 @@ function DraggableCard({
   isSelected: boolean;
   onSelect: (id: string) => void;
   onReorder: (from: number, to: number) => void;
-  onPlayDrag: (id: string) => void;
+  onPlayDrag: (id: string) => boolean;
   isFaceUp: boolean;
   selectionIndex?: number;
   isHighlighted?: boolean;
@@ -36,10 +32,21 @@ function DraggableCard({
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const isDragging = useSharedValue(false);
+  const shakeOffset = useSharedValue(0);
 
   const doSelect = useCallback(() => onSelect(card.id), [card.id, onSelect]);
   const doReorder = useCallback((f: number, t: number) => onReorder(f, t), [onReorder]);
-  const doPlayDrag = useCallback(() => onPlayDrag(card.id), [card.id, onPlayDrag]);
+  const doPlayDrag = useCallback(() => {
+    const success = onPlayDrag(card.id);
+    if (!success) {
+      shakeOffset.value = withSequence(
+        withTiming(10, { duration: 50 }),
+        withTiming(-10, { duration: 50 }),
+        withTiming(10, { duration: 50 }),
+        withTiming(0, { duration: 50 })
+      );
+    }
+  }, [card.id, onPlayDrag]);
 
   const pan = Gesture.Pan()
     .minDistance(5)
@@ -68,7 +75,7 @@ function DraggableCard({
 
   const animStyle = useAnimatedStyle(() => ({
     transform: [
-      { translateX: translateX.value },
+      { translateX: translateX.value + shakeOffset.value },
       { translateY: translateY.value + (isSelected ? -20 : 0) },
       { scale: isDragging.value ? 1.15 : 1 },
     ],
@@ -90,21 +97,23 @@ function DraggableCard({
 
 export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) => {
   const { toggleCardSelection, selectedCardIds, reorderHand, playDraggedCard, status, currentHint } = useGameStore();
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const isLandscape = screenW > screenH && screenW < 1024;
 
-  const CARD_WIDTH = isLandscapeMobile ? 54 : 64;
-  const MIN_VISIBLE_WIDTH = isLandscapeMobile ? 24 : 32;
+  // U1: Dynamic card sizing based on screen width
+  const CARD_WIDTH = isLandscape ? 54 : (screenW < 400 ? 52 : 64);
+  const MIN_VISIBLE_WIDTH = isLandscape ? 24 : (screenW < 400 ? 20 : 32);
   
   // Calculate spacing but ensure a minimum visibility for each card
-  const containerWidth = width - 32;
+  const containerWidth = screenW - 32;
   const idealSpacing = cards.length > 1 
     ? Math.min(CARD_WIDTH + 4, (containerWidth - CARD_WIDTH) / (cards.length - 1))
     : 0;
   
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
-  const totalContentWidth = cards.length > 0 ? (cards.length - 1) * finalSpacing + CARD_WIDTH : 0;
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { height: isLandscape ? 110 : 140, paddingBottom: isLandscape ? 2 : 8 }]}>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={false}
@@ -148,11 +157,9 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
 
 const styles = StyleSheet.create({
   container: {
-    height: isLandscapeMobile ? 110 : 140,
     width: '100%',
     paddingHorizontal: 16,
     justifyContent: 'flex-end',
-    paddingBottom: isLandscapeMobile ? 2 : 8,
   },
   handWrapper: {
     flexDirection: 'row',

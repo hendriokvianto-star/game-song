@@ -23,7 +23,7 @@ Kartu As memiliki sifat fleksibel namun tidak boleh memutar (*no wrap-around*):
 ## 4. Aturan Khusus Kartu Joker
 Kartu Joker adalah kartu dewa yang memiliki beberapa fungsi dan aturan mematikan:
 - **Wildcard**: Joker (dan khusus **As Sekop / Ace of Spades** yang juga bertindak sebagai Joker) dapat digunakan sebagai pengganti kartu angka maupun kembang apapun untuk membentuk Seri atau Angka Kembar.
-- **Mematikan Kartu Kembar (Dead Set)**: Jika ada pemain yang memiliki Angka Kembar (minimal *3-of-a-kind*) di atas meja, lalu ada pemain yang meletakkan **tepat 1 buah Joker** ke dalam kumpulan kartu tersebut, maka kumpulan tersebut dinyatakan **Mati (Dead) dan kartunya akan ditutup (face-down)**. Artinya, tidak ada lagi pemain yang boleh menempelkan kartu tambahan ke kumpulan tersebut hingga akhir permainan.
+- **Mematikan Kartu Kembar (Dead Set)**: Jika sebuah Angka Kembar (minimal *3-of-a-kind*) di atas meja memiliki total **2 buah Joker atau lebih**, maka kumpulan tersebut dinyatakan **Mati (Dead)**. Artinya, tidak ada lagi pemain yang boleh menempelkan kartu tambahan ke kumpulan tersebut hingga akhir permainan. Contoh: K-K-Joker masih **hidup** (1 Joker), tapi K-K-Joker-Joker sudah **mati** (2 Joker).
 
 ## 5. Pemblokiran Seri (Sequence Blocking)
 Ini adalah aturan kompetitif khas Song untuk menghalangi lawan melanjutkan seri:

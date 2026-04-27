@@ -22,6 +22,7 @@ export interface Player {
   totalScore: number; // Accumulated points across rounds
   pointsGainedThisRound?: number; // Last round performance
   difficulty?: 'easy' | 'normal' | 'expert';
+  deadlockedInOpening?: boolean; // Player eliminated before opening
 }
 
 export interface GameState {

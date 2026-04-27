@@ -117,8 +117,7 @@ export const isSameValueCombo = (cards: Card[]): boolean => {
 };
 
 export const isDeadSet = (cards: Card[]): boolean => {
-  const jokersCount = cards.filter(c => c.isJoker).length;
-  return isSameValueCombo(cards) && (jokersCount >= 2 || cards.some(c => c.isDead));
+  return isSameValueCombo(cards) && cards.some(c => c.isDead);
 };
 
 export const sortSequence = (cards: Card[]): Card[] => {
@@ -205,13 +204,7 @@ export const sortSequence = (cards: Card[]): Card[] => {
 export const sortSameValueCombo = (cards: Card[]): Card[] => {
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
-  const result = [...regulars, ...jokers];
-  // Rule: A Set with 2 or more Jokers is DEAD immediately.
-  // One Joker is allowed (K-K-Joker) and is still ALIVE.
-  if (jokers.length >= 2) {
-    return result.map(c => ({ ...c, isDead: true }));
-  }
-  return result;
+  return [...regulars, ...jokers];
 };
 
 function getCoveredValues(seq: Card[]): number[] {
@@ -299,13 +292,13 @@ export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], t
   } else if (isSameValueCombo(existing)) {
     if (isDeadSet(existing)) return { valid: false, newSequence: [] }; // Cannot extend already dead set
     if (isSameValueCombo(combined)) {
-       const hasNewJoker = playedCards.some(c => c.isJoker);
-       const sorted = sortSameValueCombo(combined);
-       // Rule: Adding a Joker to an existing set kills it
-       if (hasNewJoker) {
-         return { valid: true, newSequence: sorted.map(c => ({ ...c, isDead: true })) };
-       }
-       return { valid: true, newSequence: sorted };
+        const sorted = sortSameValueCombo(combined);
+        const addedJokers = playedCards.filter(c => c.isJoker).length;
+        // Rule: A set dies ONLY if a Joker is appended to an existing set on the table
+        if (addedJokers > 0) {
+          return { valid: true, newSequence: sorted.map(c => ({ ...c, isDead: true })) };
+        }
+        return { valid: true, newSequence: sorted };
     }
   }
   
@@ -388,10 +381,10 @@ export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]
         continue;
       }
       
-      const hasNewJoker = playedCards.some(c => c.isJoker);
       const sorted = sortSameValueCombo(combined);
-      // Rule: Adding a Joker to an existing set kills it
-      if (hasNewJoker) {
+      const addedJokers = playedCards.filter(c => c.isJoker).length;
+      // Rule: A set dies ONLY if a Joker is appended to an existing set on the table
+      if (addedJokers > 0) {
         return { valid: true, sequenceIndex: i, newSequence: sorted.map(c => ({ ...c, isDead: true })) };
       }
       return { valid: true, sequenceIndex: i, newSequence: sorted };
