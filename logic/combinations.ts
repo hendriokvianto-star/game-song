@@ -60,35 +60,55 @@ export const isSequence = (cards: Card[]): boolean => {
   return false;
 };
 
-export const isStrictOrderedSequence = (cards: Card[]): boolean => {
-  if (cards.length < 3) return false;
-  if (!isSequence(cards)) return false; 
+export const assignStrictSequence = (cards: Card[]): Card[] | null => {
+  if (cards.length < 3) return null;
+  if (!isSequence(cards)) return null; 
   
   const regulars = cards.filter(c => !c.isJoker);
-  if (regulars.length <= 1) return true; 
+  if (regulars.length === 0) return null; 
   
   const hasAce = regulars.some(c => c.rank === 'A');
+  const suit = regulars[0].suit;
+  const maxAllowed = suit === 'spades' ? 13 : 14;
   
-  const testStrict = (useAceAsOne: boolean) => {
-    let expectedNextValue: number | null = null;
-    let expectedSuit: string | null = null;
-    
-    for (const c of cards) {
-      if (c.isJoker) {
-        if (expectedNextValue !== null) expectedNextValue++;
-      } else {
-        const val = (useAceAsOne && c.rank === 'A') ? 1 : c.value;
-        if (expectedSuit === null) expectedSuit = c.suit;
-        else if (c.suit !== expectedSuit) return false;
-        
-        if (expectedNextValue !== null && val !== expectedNextValue) return false;
-        expectedNextValue = val + 1;
+  const tryStrict = (useAceAsOne: boolean): Card[] | null => {
+    let firstRegularIdx = -1;
+    for (let i = 0; i < cards.length; i++) {
+      if (!cards[i].isJoker) {
+        firstRegularIdx = i;
+        break;
       }
     }
-    return true;
+    if (firstRegularIdx === -1) return null;
+    
+    const firstRegVal = (useAceAsOne && cards[firstRegularIdx].rank === 'A') ? 1 : cards[firstRegularIdx].value;
+    const startVal = firstRegVal - firstRegularIdx;
+    
+    if (startVal < 1) return null;
+    if (startVal + cards.length - 1 > maxAllowed) return null;
+    
+    for (let i = 0; i < cards.length; i++) {
+      const expectedVal = startVal + i;
+      if (!cards[i].isJoker) {
+        const val = (useAceAsOne && cards[i].rank === 'A') ? 1 : cards[i].value;
+        if (val !== expectedVal) return null;
+        if (cards[i].suit !== suit) return null;
+      }
+    }
+    
+    return cards.map((c, i) => {
+      if (c.isJoker) {
+        return { ...c, assignedValue: startVal + i };
+      }
+      return c;
+    });
   };
 
-  return testStrict(false) || (hasAce && testStrict(true));
+  let result = tryStrict(false);
+  if (!result && hasAce) {
+    result = tryStrict(true);
+  }
+  return result;
 };
 
 export const isSequenceComplete = (seq: Card[]): boolean => {
@@ -109,8 +129,8 @@ export const isSameValueCombo = (cards: Card[]): boolean => {
   if (cards.length === 0) return false;
   const regulars = cards.filter(c => !c.isJoker);
   const jokers = cards.filter(c => c.isJoker);
-  if (regulars.length < 2) return false;
-  if (jokers.length > regulars.length) return false;
+  
+  if (regulars.length < 1) return false;
   
   const val = regulars[0].value;
   return regulars.every(c => c.value === val);
@@ -308,12 +328,10 @@ export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], t
 export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]): { valid: boolean, sequenceIndex: number, newSequence: Card[] } => {
   if (playedCards.length === 0) return { valid: false, sequenceIndex: -1, newSequence: [] };
   
-  // Start new sequence
+  // Start new sequence — try to preserve strict ordering if valid, else sort
   if (playedCards.length >= 3 && isSequence(playedCards)) {
-    if (isStrictOrderedSequence(playedCards)) {
-      return { valid: true, sequenceIndex: -1, newSequence: playedCards };
-    }
-    return { valid: true, sequenceIndex: -1, newSequence: sortSequence(playedCards) };
+    const strictSeq = assignStrictSequence(playedCards);
+    return { valid: true, sequenceIndex: -1, newSequence: strictSeq ? strictSeq : sortSequence(playedCards) };
   }
   
   // Start new 3-of-a-kind, 4-of-a-kind, or 5-of-a-kind

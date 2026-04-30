@@ -15,7 +15,7 @@ interface HandProps {
 }
 
 function DraggableCard({
-  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted, spacing
+  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted, spacing, isLandscape
 }: {
   card: CardType;
   index: number;
@@ -28,11 +28,14 @@ function DraggableCard({
   selectionIndex?: number;
   isHighlighted?: boolean;
   spacing: number;
+  isLandscape?: boolean;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const isDragging = useSharedValue(false);
   const shakeOffset = useSharedValue(0);
+  const dragThreshold = isLandscape ? -50 : -80;
+  const selectedLift = isLandscape ? -12 : -20;
 
   const doSelect = useCallback(() => onSelect(card.id), [card.id, onSelect]);
   const doReorder = useCallback((f: number, t: number) => onReorder(f, t), [onReorder]);
@@ -56,7 +59,7 @@ function DraggableCard({
       translateY.value = e.translationY;
     })
     .onEnd(() => {
-      if (translateY.value < -80) {
+      if (translateY.value < dragThreshold) {
         runOnJS(doPlayDrag)();
       } else {
         const moved = Math.round(translateX.value / spacing);
@@ -65,8 +68,8 @@ function DraggableCard({
           if (target !== index) runOnJS(doReorder)(index, target);
         }
       }
-      translateX.value = withSpring(0, { damping: 15 });
-      translateY.value = withSpring(0, { damping: 15 });
+      translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
+      translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
       isDragging.value = false;
     });
 
@@ -76,8 +79,8 @@ function DraggableCard({
   const animStyle = useAnimatedStyle(() => ({
     transform: [
       { translateX: translateX.value + shakeOffset.value },
-      { translateY: translateY.value + (isSelected ? -20 : 0) },
-      { scale: isDragging.value ? 1.15 : 1 },
+      { translateY: translateY.value + (isSelected ? selectedLift : 0) },
+      { scale: isDragging.value ? 1.08 : 1 },
     ],
     zIndex: isDragging.value ? 100 : 1,
   }));
@@ -86,8 +89,8 @@ function DraggableCard({
     <GestureDetector gesture={gesture}>
       <Animated.View 
         style={animStyle}
-        entering={FadeInDown.duration(300).springify()}
-        layout={LinearTransition.springify()}
+        entering={FadeInDown.duration(250)}
+        layout={LinearTransition.duration(200)}
       >
         <CardComponent card={card} isSelected={isSelected} isFaceUp={isFaceUp} selectionIndex={selectionIndex} isHighlighted={isHighlighted} />
       </Animated.View>
@@ -101,8 +104,8 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const isLandscape = screenW > screenH && screenW < 1024;
 
   // U1: Dynamic card sizing based on screen width
-  const CARD_WIDTH = isLandscape ? 54 : (screenW < 400 ? 52 : 64);
-  const MIN_VISIBLE_WIDTH = isLandscape ? 24 : (screenW < 400 ? 20 : 32);
+  const CARD_WIDTH = isLandscape ? 42 : (screenW < 400 ? 52 : 64);
+  const MIN_VISIBLE_WIDTH = isLandscape ? 18 : (screenW < 400 ? 20 : 32);
   
   // Calculate spacing but ensure a minimum visibility for each card
   const containerWidth = screenW - 32;
@@ -113,13 +116,13 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
 
   return (
-    <View style={[styles.container, { height: isLandscape ? 110 : 140, paddingBottom: isLandscape ? 2 : 8 }]}>
+    <View style={[styles.container, { height: isLandscape ? 100 : 130, paddingBottom: isLandscape ? 4 : 12, paddingTop: isLandscape ? 16 : 24, paddingHorizontal: isLandscape ? 4 : 16, overflow: 'visible' }]}>
       <ScrollView 
         horizontal 
-        showsHorizontalScrollIndicator={false}
+        showsHorizontalScrollIndicator={isLandscape}
         contentContainerStyle={[
           styles.handWrapper, 
-          { minWidth: '100%', paddingHorizontal: 16 }
+          { minWidth: '100%', paddingHorizontal: isLandscape ? 4 : 16 }
         ]}
       >
         {cards.map((card, index) => {
@@ -141,11 +144,12 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
                 isSelected={selIdx >= 0}
                 onSelect={isCurrentPlayer ? toggleCardSelection : () => {}}
                 onReorder={reorderHand}
-                onPlayDrag={isCurrentPlayer ? playDraggedCard : () => {}}
+                onPlayDrag={isCurrentPlayer ? playDraggedCard : () => false}
                 isFaceUp={status !== 'dealing'}
                 selectionIndex={selectionIndex}
                 isHighlighted={currentHint?.cardIds.includes(card.id)}
                 spacing={finalSpacing}
+                isLandscape={isLandscape}
               />
             </View>
           );

@@ -24,7 +24,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
-        { translateY: withSpring(isSelected ? -20 : 0, { damping: 12, stiffness: 180 }) }
+        { translateY: withSpring(isSelected ? -20 : 0, { damping: 18, stiffness: 200 }) }
       ]
     };
   });
@@ -52,11 +52,12 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
     }
   };
 
-  let cardW = compact ? 44 : 60;
-  let cardH = compact ? 66 : 90;
-  if (!compact && getIsLandscape()) {
-    cardW = 50;
-    cardH = 75;
+  const landscape = getIsLandscape();
+  let cardW = compact ? (landscape ? 36 : 44) : 60;
+  let cardH = compact ? (landscape ? 52 : 66) : 90;
+  if (!compact && landscape) {
+    cardW = 42;
+    cardH = 62;
   }
 
   if (!isFaceUp) {
@@ -127,7 +128,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     elevation: 3,
-    marginHorizontal: -8,
+    marginHorizontal: -6,
     ...(Platform.OS === 'web' ? {
       boxShadow: '0px 2px 4px rgba(0,0,0,0.15)',
     } : {}),
@@ -191,7 +192,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   rank: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
   },
   suitSmall: {
@@ -199,8 +200,8 @@ const styles = StyleSheet.create({
     marginTop: -2,
   },
   suitCenter: {
-    fontSize: 26,
-    marginBottom: 4,
+    fontSize: 22,
+    marginBottom: 2,
   },
   selectionBadge: {
     position: 'absolute',

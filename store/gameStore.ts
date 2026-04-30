@@ -43,6 +43,7 @@ interface GameStore extends GameState {
   nextTutorialStep: () => void;
   skipDeal: () => void;
   closeTutorial: () => void;
+  exitToMenu: () => void;
   showDialog: (title: string, message: string, actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }[]) => void;
   hideDialog: () => void;
 }
@@ -169,8 +170,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const players: Player[] = [
       { id: 'p1', name: 'You', hand: [], isAI: false, totalScore: 0 },
-      { id: 'p2', name: 'Bot 1', hand: [], isAI: true, totalScore: 0, difficulty: 'easy' },
-      { id: 'p3', name: 'Bot 2', hand: [], isAI: true, totalScore: 0, difficulty: 'normal' },
+      { id: 'p2', name: 'Bot 1', hand: [], isAI: true, totalScore: 0, difficulty: 'expert' },
+      { id: 'p3', name: 'Bot 2', hand: [], isAI: true, totalScore: 0, difficulty: 'expert' },
       { id: 'p4', name: 'Bot 3', hand: [], isAI: true, totalScore: 0, difficulty: 'expert' },
       { id: 'p5', name: 'Bot 4', hand: [], isAI: true, totalScore: 0, difficulty: 'expert' },
     ];
@@ -885,5 +886,28 @@ export const useGameStore = create<GameStore>((set, get) => ({
     setTimeout(() => {
       get().executeOpeningPhase();
     }, 500);
+  },
+
+  exitToMenu: () => {
+    set({
+      deck: [],
+      discardPile: [],
+      players: [],
+      currentPlayerIndex: 0,
+      direction: 1,
+      status: 'idle',
+      winnerId: undefined,
+      finishCount: 0,
+      activeSequences: [],
+      selectedCardIds: [],
+      lastPlayInfo: null,
+      playHistory: [],
+      consecutivePasses: 0,
+      cardsDealt: 0,
+      currentHint: null,
+      sfxTrigger: null,
+      tutorialStep: null,
+      dialogConfig: null,
+    });
   },
 }));

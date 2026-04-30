@@ -22,7 +22,7 @@ export function CustomDialog() {
       
       <Animated.View 
         style={styles.dialogBox}
-        entering={SlideInUp.springify().damping(15)}
+        entering={SlideInUp.duration(300).damping(20).stiffness(150)}
         exiting={SlideOutDown.duration(200)}
       >
         <Text style={styles.title}>{dialogConfig.title}</Text>

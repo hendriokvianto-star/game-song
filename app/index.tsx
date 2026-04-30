@@ -80,6 +80,43 @@ export default function GameBoard() {
     };
   }, []);
 
+  // Handle Android back button
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const backHandler = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (status === 'idle') {
+        // On menu screen — exit app normally
+        return false;
+      }
+      // During gameplay — show confirmation dialog
+      useGameStore.getState().showDialog(
+        language === 'id' ? 'Keluar dari Permainan?' : 'Exit Game?',
+        language === 'id' 
+          ? 'Progres ronde ini akan hilang. Apakah Anda yakin ingin kembali ke menu utama?' 
+          : 'Current round progress will be lost. Are you sure you want to return to the main menu?',
+        [
+          { text: language === 'id' ? 'Batal' : 'Cancel', style: 'cancel' },
+          { 
+            text: language === 'id' ? 'Ya, Keluar' : 'Yes, Exit', 
+            style: 'destructive', 
+            onPress: () => {
+              if (soundRef.current) {
+                soundRef.current.unloadAsync();
+                soundRef.current = null;
+                setIsMusicPlaying(false);
+              }
+              useGameStore.getState().exitToMenu();
+            }
+          },
+        ]
+      );
+      return true; // Prevent default back behavior
+    });
+
+    return () => backHandler.remove();
+  }, [status, language]);
+
   useEffect(() => {
     if (currentHint) {
       const timer = setTimeout(() => {
@@ -163,42 +200,162 @@ export default function GameBoard() {
   const isTutorialStepZero = tutorialStep === 0;
 
   if (status === 'idle' && !isTutorialActive) {
+    const isMenuLandscape = screenW > screenH;
+
     return (
       <View style={[
         styles.loadingScreen, 
         { paddingTop: insets.top, paddingBottom: insets.bottom, paddingLeft: insets.left, paddingRight: insets.right }
       ]}>
         <StatusBar hidden />
-        <Text style={styles.loadingEmoji}>🃏</Text>
-        <Text style={styles.loadingTitle}>{t.song}</Text>
-        <Text style={styles.loadingSubtitle}>Indonesian Card Game</Text>
 
-        <View style={styles.menuContainer}>
-          <Pressable style={styles.menuButton} onPress={() => { playBGM(); initializeGame(); }}>
-            <Text style={styles.menuButtonText}>▶ {t.startGame}</Text>
-          </Pressable>
-
-          <Pressable style={[styles.menuButton, { backgroundColor: '#3498db' }]} onPress={() => setShowRules(true)}>
-            <Text style={styles.menuButtonText}>📜 {t.gameRules}</Text>
-          </Pressable>
-
-          <Pressable style={[styles.menuButton, { backgroundColor: '#9b59b6' }]} onPress={() => { playBGM(); startTutorial(); }}>
-            <Text style={styles.menuButtonText}>💡 Tutorial</Text>
-          </Pressable>
-
-          <Pressable 
-            style={[styles.menuButton, styles.exitButton]} 
-            onPress={() => {
-              if (Platform.OS === 'android') {
-                BackHandler.exitApp();
-              } else {
-                alert("Gunakan tombol Home perangkat Anda untuk keluar.");
-              }
-            }}
-          >
-            <Text style={styles.menuButtonText}>🚪 {t.exit}</Text>
-          </Pressable>
+        {/* Floating decorative card symbols */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+          {['♠', '♥', '♦', '♣', '🃏', '♠', '♥', '♦', '♣'].map((sym, i) => (
+            <Animated.Text
+              key={i}
+              entering={FadeIn.delay(300 + i * 150).duration(800)}
+              style={{
+                position: 'absolute',
+                fontSize: 20 + (i % 3) * 12,
+                color: sym === '♥' || sym === '♦' ? 'rgba(231,76,60,0.08)' : 'rgba(232,217,176,0.06)',
+                top: `${10 + (i * 11) % 80}%`,
+                left: `${5 + (i * 13) % 85}%`,
+                transform: [{ rotate: `${-20 + i * 15}deg` }],
+              }}
+            >
+              {sym}
+            </Animated.Text>
+          ))}
         </View>
+
+        {/* Main Content — responsive for landscape */}
+        <View style={isMenuLandscape ? {
+          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 48, width: '100%', paddingHorizontal: 40,
+        } : { alignItems: 'center' }}>
+
+          {/* Title Section */}
+          <Animated.View entering={FadeInDown.duration(600)} style={{ alignItems: 'center' }}>
+            <Animated.Text entering={ZoomIn.delay(200).duration(500)} style={styles.loadingEmoji}>🃏</Animated.Text>
+            
+            {/* Glowing title box */}
+            <View style={{
+              borderWidth: 1.5,
+              borderColor: 'rgba(232,217,176,0.25)',
+              borderRadius: 16,
+              paddingHorizontal: 28,
+              paddingVertical: 12,
+              marginTop: 8,
+              backgroundColor: 'rgba(232,217,176,0.04)',
+            }}>
+              <Text style={[styles.loadingTitle, { fontSize: isMenuLandscape ? 36 : 40 }]}>{t.song}</Text>
+            </View>
+
+            <Text style={[styles.loadingSubtitle, { marginTop: 12, fontSize: 13 }]}>Indonesian Card Game</Text>
+
+            {/* Decorative suits row */}
+            <Animated.View entering={FadeIn.delay(600).duration(500)} style={{ flexDirection: 'row', gap: 16, marginTop: 14 }}>
+              {['♠', '♥', '♦', '♣'].map((s, i) => (
+                <Text key={i} style={{ 
+                  fontSize: 18, 
+                  color: s === '♥' || s === '♦' ? 'rgba(231,76,60,0.5)' : 'rgba(232,217,176,0.35)'
+                }}>{s}</Text>
+              ))}
+            </Animated.View>
+          </Animated.View>
+
+          {/* Menu Buttons Section */}
+          <Animated.View entering={FadeInUp.delay(400).duration(600)} style={[
+            styles.menuContainer, 
+            { 
+              marginTop: isMenuLandscape ? 0 : 40, 
+              gap: isMenuLandscape ? 10 : 14,
+              maxWidth: isMenuLandscape ? 260 : 300,
+            }
+          ]}>
+            {/* Start Game — Primary CTA */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.menuButton, 
+                { 
+                  backgroundColor: pressed ? '#27ae60' : '#2ecc71',
+                  paddingVertical: isMenuLandscape ? 12 : 16,
+                  borderWidth: 1.5,
+                  borderColor: 'rgba(46,204,113,0.4)',
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                },
+              ]} 
+              onPress={() => { playBGM(); initializeGame(); }}
+            >
+              <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 16 : 18 }]}>▶ {t.startGame}</Text>
+            </Pressable>
+
+            {/* Rules — Secondary */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.menuButton, 
+                { 
+                  backgroundColor: pressed ? 'rgba(52,152,219,0.3)' : 'rgba(52,152,219,0.15)', 
+                  borderWidth: 1, 
+                  borderColor: 'rgba(52,152,219,0.4)',
+                  paddingVertical: isMenuLandscape ? 10 : 14,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                }
+              ]} 
+              onPress={() => setShowRules(true)}
+            >
+              <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 14 : 16, color: '#5dade2' }]}>📜 {t.gameRules}</Text>
+            </Pressable>
+
+            {/* Tutorial — Tertiary */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.menuButton, 
+                { 
+                  backgroundColor: pressed ? 'rgba(241,196,15,0.25)' : 'rgba(241,196,15,0.1)', 
+                  borderWidth: 1, 
+                  borderColor: 'rgba(241,196,15,0.3)',
+                  paddingVertical: isMenuLandscape ? 10 : 14,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                }
+              ]} 
+              onPress={() => { playBGM(); startTutorial(); }}
+            >
+              <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 14 : 16, color: '#f1c40f' }]}>💡 Tutorial</Text>
+            </Pressable>
+
+            {/* Exit — Minimal danger */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.menuButton, 
+                { 
+                  backgroundColor: pressed ? 'rgba(231,76,60,0.25)' : 'rgba(231,76,60,0.08)', 
+                  borderWidth: 1, 
+                  borderColor: 'rgba(231,76,60,0.25)',
+                  paddingVertical: isMenuLandscape ? 8 : 12,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                }
+              ]} 
+              onPress={() => {
+                if (Platform.OS === 'android') {
+                  BackHandler.exitApp();
+                } else {
+                  alert("Gunakan tombol Home perangkat Anda untuk keluar.");
+                }
+              }}
+            >
+              <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 13 : 14, color: 'rgba(231,76,60,0.7)' }]}>🚪 {t.exit}</Text>
+            </Pressable>
+          </Animated.View>
+        </View>
+
+        {/* Footer */}
+        <Animated.Text 
+          entering={FadeIn.delay(1000).duration(500)}
+          style={{ position: 'absolute', bottom: insets.bottom + 12, color: 'rgba(232,217,176,0.15)', fontSize: 10 }}
+        >
+          v1.0 • Card Game
+        </Animated.Text>
 
         {tutorialStep !== null && <TutorialOverlay />}
       </View>
@@ -328,7 +485,7 @@ export default function GameBoard() {
           </View>
 
           {/* Hand */}
-          <View style={{ opacity: isHumanFinished ? 0.5 : 1 }}>
+          <View style={{ opacity: isHumanFinished ? 0.5 : 1, overflow: 'visible' as any }}>
             <Hand cards={humanPlayer.hand} isCurrentPlayer={!isHumanFinished} />
           </View>
         </Animated.View>
