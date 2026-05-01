@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useGameStore } from '../store/gameStore';
 import { translations } from '../logic/i18n';
 import { useShallow } from 'zustand/react/shallow';
+import { getResponsiveCardSize } from '../app/styles';
 
 export function TutorialOverlay() {
   const { tutorialStep, nextTutorialStep, closeTutorial, language } = useGameStore(useShallow(state => ({
@@ -16,7 +17,7 @@ export function TutorialOverlay() {
   const t = translations[language];
   const { width: screenW, height: screenH } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  // Use height-based detection: compact layout when viewport is short (landscape mobile or constrained browser)
+  
   const isLandscape = screenW > screenH && screenH < 500;
   
   if (tutorialStep === null) return null;
@@ -31,10 +32,13 @@ export function TutorialOverlay() {
   const usableRight = insets.right;
   const usableTop = insets.top;
 
+  // Calculate dynamic card sizes to align highlights correctly
+  const { height: cardH } = getResponsiveCardSize(true, screenW, screenH);
+
   const headerH = isLandscape ? 13 : 36;
   const botsH = isLandscape ? 32 : 90;
   const humanHeaderH = isLandscape ? 28 : 48; // Button bar actual height including padding
-  const handH = isLandscape ? 62 : 110;
+  const handH = isLandscape ? cardH + 10 : cardH + 44;
 
   const botsTop = usableTop + headerH;
   const tableTop = botsTop + botsH;
