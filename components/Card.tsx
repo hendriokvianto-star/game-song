@@ -1,13 +1,30 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Platform, Dimensions } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Card as CardType } from '../logic/types';
+import { CardImages } from '../assets/cards';
 
 // Called at render time (not module scope) so it picks up current dimensions
 const getIsLandscape = () => {
   const { width, height } = Dimensions.get('window');
-  return width > height && width < 1024;
+  return width > height && height < 500;
+};
+
+const getCardImageSource = (card: CardType) => {
+  if (card.rank === 'Joker') return CardImages['X1'];
+  
+  let rankCode = card.rank === '10' ? '0' : card.rank;
+  let suitCode = '';
+  switch (card.suit) {
+    case 'hearts': suitCode = 'H'; break;
+    case 'diamonds': suitCode = 'D'; break;
+    case 'clubs': suitCode = 'C'; break;
+    case 'spades': suitCode = 'S'; break;
+  }
+  
+  return CardImages[`${rankCode}${suitCode}`];
 };
 
 interface CardProps {
@@ -21,13 +38,15 @@ interface CardProps {
 }
 
 export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, onPress, isFaceUp = true, compact = false, selectionIndex, isHighlighted = false }) => {
+  const [imageLoaded, setImageLoaded] = useState(false);
+  
   const animatedStyle = useAnimatedStyle(() => {
     return {
       transform: [
         { translateY: withSpring(isSelected ? -20 : 0, { damping: 18, stiffness: 200 }) }
       ]
     };
-  });
+  }, [isSelected]);
 
   const handlePress = () => {
     if (onPress) {
@@ -55,10 +74,6 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
   const landscape = getIsLandscape();
   let cardW = compact ? (landscape ? 36 : 44) : 60;
   let cardH = compact ? (landscape ? 52 : 66) : 90;
-  if (!compact && landscape) {
-    cardW = 42;
-    cardH = 62;
-  }
 
   if (!isFaceUp) {
     return (
@@ -70,14 +85,27 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
     );
   }
 
+  const imageSource = getCardImageSource(card);
+
   if (card.rank === 'Joker') {
     return (
       <Pressable onPress={handlePress}>
-        <Animated.View style={[styles.card, styles.jokerCard, animatedStyle, isSelected && styles.selected, isHighlighted && styles.highlighted, { width: cardW, height: cardH }]}>
-          <Text style={[styles.rank, styles.jokerText]}>
-            🃏
-          </Text>
-          <Text style={styles.jokerStar}>★</Text>
+        <Animated.View style={[styles.card, styles.jokerCard, animatedStyle, isSelected && styles.selected, isHighlighted && styles.highlighted, { width: cardW, height: cardH, padding: 0, overflow: 'hidden' }]}>
+          {/* Fallback Text UI (rendered under image) */}
+          <View style={[StyleSheet.absoluteFillObject, { padding: 4, justifyContent: 'space-between', alignItems: 'center' }]}>
+            <Text style={[styles.rank, styles.jokerText]}>
+              🃏
+            </Text>
+            <Text style={styles.jokerStar}>★</Text>
+          </View>
+          
+          <Image 
+            source={imageSource} 
+            style={[StyleSheet.absoluteFillObject, { opacity: imageLoaded ? 1 : 0 }]} 
+            contentFit="fill"
+            onLoad={() => setImageLoaded(true)}
+          />
+
           {isSelected && selectionIndex !== undefined && (
             <View style={styles.selectionBadge}>
               <Text style={styles.selectionBadgeText}>{selectionIndex}</Text>
@@ -96,13 +124,24 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
         isSelected && styles.selected, 
         isHighlighted && styles.highlighted,
         card.isDead && styles.deadCard,
-        { width: cardW, height: cardH }
+        { width: cardW, height: cardH, padding: 0, overflow: 'hidden' }
       ]}>
-        <View style={[styles.cardCorner, card.isDead && styles.deadContent]}>
-          <Text style={[styles.rank, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{card.rank}</Text>
-          <Text style={[styles.suitSmall, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
+        {/* Fallback Text UI (rendered under image) */}
+        <View style={[StyleSheet.absoluteFillObject, { padding: 4, justifyContent: 'space-between', alignItems: 'center' }]}>
+          <View style={[styles.cardCorner, card.isDead && styles.deadContent]}>
+            <Text style={[styles.rank, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{card.rank}</Text>
+            <Text style={[styles.suitSmall, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
+          </View>
+          <Text style={[styles.suitCenter, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
         </View>
-        <Text style={[styles.suitCenter, { color: card.isDead ? '#7f8c8d' : getColor() }]}>{getSuitSymbol()}</Text>
+        
+        <Image 
+          source={imageSource} 
+          style={[StyleSheet.absoluteFillObject, { opacity: imageLoaded ? (card.isDead ? 0.5 : 1) : 0 }]} 
+          contentFit="fill"
+          onLoad={() => setImageLoaded(true)}
+        />
+
         {isSelected && selectionIndex !== undefined && (
           <View style={styles.selectionBadge}>
             <Text style={styles.selectionBadgeText}>{selectionIndex}</Text>

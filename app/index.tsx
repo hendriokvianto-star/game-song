@@ -25,6 +25,7 @@ import { useShallow } from 'zustand/react/shallow';
 export default function GameBoard() {
   const [showRules, setShowRules] = useState(false);
   const [showLog, setShowLog] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const {
     players, status, currentPlayerIndex, initializeGame,
     playSelectedCards, passTurn, activeSequences, executeAITurn,
@@ -195,6 +196,144 @@ export default function GameBoard() {
     return <RulesScreen onClose={() => setShowRules(false)} />;
   }
 
+  if (showSettings) {
+    const isSettingsLandscape = screenW > screenH;
+    const themes = [
+      { key: 'classic' as const, emoji: '🌿', label: t.themeClassic, color: '#2ecc71' },
+      { key: 'luxury' as const, emoji: '🔥', label: t.themeLuxury, color: '#e67e22' },
+      { key: 'ocean' as const, emoji: '🌊', label: t.themeOcean, color: '#3498db' },
+      { key: 'midnight' as const, emoji: '🌙', label: t.themeMidnight, color: '#95a5a6' },
+    ];
+
+    return (
+      <View style={[
+        styles.loadingScreen, 
+        { paddingTop: insets.top + 16, paddingBottom: insets.bottom + 16, paddingHorizontal: 24 }
+      ]}>
+        <StatusBar hidden />
+
+        {/* Header */}
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', width: '100%', maxWidth: 500, marginBottom: isSettingsLandscape ? 12 : 24 }}>
+          <Text style={{ fontSize: isSettingsLandscape ? 20 : 26, fontWeight: '800', color: '#E8D9B0', letterSpacing: 2 }}>⚙️ {t.settings}</Text>
+          <Pressable 
+            onPress={() => setShowSettings(false)}
+            style={({ pressed }) => ({
+              backgroundColor: pressed ? 'rgba(232,217,176,0.2)' : 'rgba(232,217,176,0.08)',
+              paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20,
+              borderWidth: 1, borderColor: 'rgba(232,217,176,0.2)',
+            })}
+          >
+            <Text style={{ color: '#E8D9B0', fontWeight: '700', fontSize: 13 }}>← {t.settingsBack}</Text>
+          </Pressable>
+        </View>
+
+        <ScrollView 
+          style={{ flex: 1, width: '100%' }} 
+          contentContainerStyle={{ 
+            maxWidth: 500, alignSelf: 'center', 
+            flexDirection: isSettingsLandscape ? 'row' : 'column',
+            gap: isSettingsLandscape ? 20 : 0,
+            flexWrap: isSettingsLandscape ? 'wrap' : 'nowrap',
+          }}
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Theme Section */}
+          <View style={{ marginBottom: isSettingsLandscape ? 0 : 24, flex: isSettingsLandscape ? 1 : undefined, minWidth: isSettingsLandscape ? 200 : undefined }}>
+            <Text style={{ color: 'rgba(232,217,176,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>
+              {t.settingsTheme}
+            </Text>
+            <View style={{ gap: 8 }}>
+              {themes.map(th => (
+                <Pressable
+                  key={th.key}
+                  onPress={() => setTheme(th.key)}
+                  style={({ pressed }) => ({
+                    flexDirection: 'row', alignItems: 'center', gap: 12,
+                    backgroundColor: currentTheme === th.key ? `${th.color}22` : 'rgba(255,255,255,0.04)',
+                    borderWidth: currentTheme === th.key ? 1.5 : 1,
+                    borderColor: currentTheme === th.key ? `${th.color}66` : 'rgba(255,255,255,0.08)',
+                    borderRadius: 12, paddingHorizontal: 16, paddingVertical: isSettingsLandscape ? 10 : 14,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  })}
+                >
+                  <Text style={{ fontSize: 20 }}>{th.emoji}</Text>
+                  <Text style={{ 
+                    color: currentTheme === th.key ? th.color : 'rgba(255,255,255,0.6)',
+                    fontWeight: currentTheme === th.key ? '700' : '500', fontSize: 15,
+                  }}>{th.label}</Text>
+                  {currentTheme === th.key && (
+                    <Text style={{ marginLeft: 'auto', color: th.color, fontSize: 16 }}>✓</Text>
+                  )}
+                </Pressable>
+              ))}
+            </View>
+          </View>
+
+          {/* Language & Music Section */}
+          <View style={{ flex: isSettingsLandscape ? 1 : undefined, minWidth: isSettingsLandscape ? 200 : undefined }}>
+            {/* Language */}
+            <Text style={{ color: 'rgba(232,217,176,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>
+              {t.settingsLanguage}
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 8, marginBottom: isSettingsLandscape ? 20 : 24 }}>
+              {([['id', '🇮🇩', 'Indonesia'], ['en', '🇬🇧', 'English']] as const).map(([lang, flag, label]) => (
+                <Pressable
+                  key={lang}
+                  onPress={() => setLanguage(lang)}
+                  style={({ pressed }) => ({
+                    flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8,
+                    backgroundColor: language === lang ? 'rgba(232,217,176,0.12)' : 'rgba(255,255,255,0.04)',
+                    borderWidth: language === lang ? 1.5 : 1,
+                    borderColor: language === lang ? 'rgba(232,217,176,0.3)' : 'rgba(255,255,255,0.08)',
+                    borderRadius: 12, paddingVertical: isSettingsLandscape ? 10 : 14,
+                    transform: [{ scale: pressed ? 0.97 : 1 }],
+                  })}
+                >
+                  <Text style={{ fontSize: 18 }}>{flag}</Text>
+                  <Text style={{ 
+                    color: language === lang ? '#E8D9B0' : 'rgba(255,255,255,0.5)',
+                    fontWeight: language === lang ? '700' : '500', fontSize: 14,
+                  }}>{label}</Text>
+                </Pressable>
+              ))}
+            </View>
+
+            {/* Music */}
+            <Text style={{ color: 'rgba(232,217,176,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10, textTransform: 'uppercase' }}>
+              {t.settingsMusic}
+            </Text>
+            <Pressable
+              onPress={toggleMusic}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: isMusicPlaying ? 'rgba(46,204,113,0.12)' : 'rgba(255,255,255,0.04)',
+                borderWidth: 1,
+                borderColor: isMusicPlaying ? 'rgba(46,204,113,0.3)' : 'rgba(255,255,255,0.08)',
+                borderRadius: 12, paddingHorizontal: 16, paddingVertical: isSettingsLandscape ? 10 : 14,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 20 }}>{isMusicPlaying ? '🎵' : '🔇'}</Text>
+                <Text style={{ color: isMusicPlaying ? '#2ecc71' : 'rgba(255,255,255,0.5)', fontWeight: '600', fontSize: 15 }}>
+                  BGM
+                </Text>
+              </View>
+              <View style={{
+                backgroundColor: isMusicPlaying ? '#2ecc71' : 'rgba(255,255,255,0.15)',
+                paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12,
+              }}>
+                <Text style={{ color: isMusicPlaying ? '#0F1F15' : 'rgba(255,255,255,0.5)', fontWeight: '800', fontSize: 11 }}>
+                  {isMusicPlaying ? t.settingsMusicOn : t.settingsMusicOff}
+                </Text>
+              </View>
+            </Pressable>
+          </View>
+        </ScrollView>
+      </View>
+    );
+  }
+
   // Show game board during tutorial steps >= 1
   const isTutorialActive = tutorialStep !== null && tutorialStep > 0;
   const isTutorialStepZero = tutorialStep === 0;
@@ -324,6 +463,23 @@ export default function GameBoard() {
               <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 14 : 16, color: '#f1c40f' }]}>💡 Tutorial</Text>
             </Pressable>
 
+            {/* Settings */}
+            <Pressable 
+              style={({ pressed }) => [
+                styles.menuButton, 
+                { 
+                  backgroundColor: pressed ? 'rgba(232,217,176,0.2)' : 'rgba(232,217,176,0.08)', 
+                  borderWidth: 1, 
+                  borderColor: 'rgba(232,217,176,0.2)',
+                  paddingVertical: isMenuLandscape ? 10 : 14,
+                  transform: [{ scale: pressed ? 0.97 : 1 }],
+                }
+              ]} 
+              onPress={() => setShowSettings(true)}
+            >
+              <Text style={[styles.menuButtonText, { fontSize: isMenuLandscape ? 14 : 16, color: '#E8D9B0' }]}>⚙️ {t.settings}</Text>
+            </Pressable>
+
             {/* Exit — Minimal danger */}
             <Pressable 
               style={({ pressed }) => [
@@ -384,6 +540,7 @@ export default function GameBoard() {
         <View style={styles.mainContent}>
           <View style={styles.header}>
             <Text style={styles.headerTitle}>🃏 Song</Text>
+            <GameStatusBar />
             <View style={styles.headerRight}>
               <Text style={styles.seqCount}>{activeSequences.length} {t.seq}</Text>
               <Pressable onPress={() => setShowLog(true)} style={styles.openLogBtn}>
@@ -403,9 +560,6 @@ export default function GameBoard() {
           />
         ))}
       </View>
-
-      {/* Status Bar */}
-      <GameStatusBar />
 
       {/* Hint Notification Overlay */}
       {currentHint && (

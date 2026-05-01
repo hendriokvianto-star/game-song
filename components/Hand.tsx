@@ -35,7 +35,7 @@ function DraggableCard({
   const isDragging = useSharedValue(false);
   const shakeOffset = useSharedValue(0);
   const dragThreshold = isLandscape ? -50 : -80;
-  const selectedLift = isLandscape ? -12 : -20;
+  const selectedLift = isLandscape ? -8 : -20;
 
   const doSelect = useCallback(() => onSelect(card.id), [card.id, onSelect]);
   const doReorder = useCallback((f: number, t: number) => onReorder(f, t), [onReorder]);
@@ -83,7 +83,7 @@ function DraggableCard({
       { scale: isDragging.value ? 1.08 : 1 },
     ],
     zIndex: isDragging.value ? 100 : 1,
-  }));
+  }), [isSelected, selectedLift]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -92,7 +92,7 @@ function DraggableCard({
         entering={FadeInDown.duration(250)}
         layout={LinearTransition.duration(200)}
       >
-        <CardComponent card={card} isSelected={isSelected} isFaceUp={isFaceUp} selectionIndex={selectionIndex} isHighlighted={isHighlighted} />
+        <CardComponent card={card} isSelected={isSelected} isFaceUp={isFaceUp} selectionIndex={selectionIndex} isHighlighted={isHighlighted} compact />
       </Animated.View>
     </GestureDetector>
   );
@@ -101,11 +101,11 @@ function DraggableCard({
 export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) => {
   const { toggleCardSelection, selectedCardIds, reorderHand, playDraggedCard, status, currentHint } = useGameStore();
   const { width: screenW, height: screenH } = useWindowDimensions();
-  const isLandscape = screenW > screenH && screenW < 1024;
+  const isLandscape = screenW > screenH && screenH < 500;
 
-  // U1: Dynamic card sizing based on screen width
-  const CARD_WIDTH = isLandscape ? 42 : (screenW < 400 ? 52 : 64);
-  const MIN_VISIBLE_WIDTH = isLandscape ? 18 : (screenW < 400 ? 20 : 32);
+  // U1: Dynamic card sizing — match table compact card dimensions
+  const CARD_WIDTH = isLandscape ? 36 : 44;
+  const MIN_VISIBLE_WIDTH = isLandscape ? 16 : 20;
   
   // Calculate spacing but ensure a minimum visibility for each card
   const containerWidth = screenW - 32;
@@ -116,7 +116,7 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
 
   return (
-    <View style={[styles.container, { height: isLandscape ? 100 : 130, paddingBottom: isLandscape ? 4 : 12, paddingTop: isLandscape ? 16 : 24, paddingHorizontal: isLandscape ? 4 : 16, overflow: 'visible' }]}>
+    <View style={[styles.container, { height: isLandscape ? 62 : 110, paddingBottom: isLandscape ? 0 : 8, paddingTop: isLandscape ? 10 : 8, paddingHorizontal: isLandscape ? 4 : 12, overflow: 'visible' }]}>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={isLandscape}

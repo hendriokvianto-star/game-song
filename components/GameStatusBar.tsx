@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text } from 'react-native';
+import { Text } from 'react-native';
 import { useGameStore } from '../store/gameStore';
 import { translations } from '../logic/i18n';
 import { styles } from '../app/styles';
@@ -17,21 +17,15 @@ export function GameStatusBar() {
   const t = translations[language];
   const currentPlayer = players[currentPlayerIndex];
 
+  const statusMsg = lastPlayInfo 
+    ? lastPlayInfo.message 
+    : consecutivePasses > 0 
+      ? `${consecutivePasses} ${t.passes}`
+      : `${currentPlayer?.name} ${t.turn}`;
+
   return (
-    <View style={styles.statusBar}>
-      {lastPlayInfo ? (
-        <Text style={styles.statusText}>
-          {lastPlayInfo.message}
-        </Text>
-      ) : consecutivePasses > 0 ? (
-        <Text style={styles.statusText}>
-          {consecutivePasses} {t.passes}
-        </Text>
-      ) : (
-        <Text style={styles.statusText}>
-          {currentPlayer?.name} {t.turn}
-        </Text>
-      )}
-    </View>
+    <Text style={styles.statusText} numberOfLines={1} ellipsizeMode="tail">
+      {statusMsg}
+    </Text>
   );
 }
