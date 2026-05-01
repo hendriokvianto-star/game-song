@@ -375,22 +375,23 @@ export default function GameBoard() {
         {/* Main Content — Glassmorphism Container */}
         <View style={[
           isMenuLandscape ? {
-            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 48, paddingHorizontal: 40,
-          } : { alignItems: 'center' },
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 32,
+            width: '90%', maxWidth: 700,
+          } : { alignItems: 'center', width: '85%', maxWidth: 360 },
           {
-            backgroundColor: 'rgba(15, 31, 21, 0.4)', // Glassmorphism base
+            backgroundColor: 'rgba(20, 40, 28, 0.4)', // Glassmorphism base
             borderRadius: 32,
-            padding: isMenuLandscape ? 30 : 40,
+            padding: isMenuLandscape ? 40 : 40,
             borderWidth: 1,
-            borderColor: 'rgba(255,255,255,0.1)',
+            borderColor: 'rgba(255,255,255,0.15)',
             overflow: 'hidden',
           }
         ]}>
-          {/* Glass Reflection effect */}
-          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', backgroundColor: 'rgba(255,255,255,0.03)', borderTopLeftRadius: 32, borderTopRightRadius: 32 }} />
+          {/* Subtle gradient overlay for glass effect instead of harsh line */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: 'rgba(255,255,255,0.02)' }} />
 
           {/* Title Section */}
-          <Animated.View entering={FadeInDown.duration(600)} style={{ alignItems: 'center' }}>
+          <Animated.View entering={FadeInDown.duration(600)} style={{ alignItems: 'center', flex: isMenuLandscape ? 1 : undefined }}>
             <Animated.Text entering={ZoomIn.delay(200).duration(500)} style={styles.loadingEmoji}>🃏</Animated.Text>
             
             {/* Glowing title box */}
@@ -403,10 +404,10 @@ export default function GameBoard() {
               marginTop: 8,
               backgroundColor: 'rgba(232,217,176,0.04)',
             }}>
-              <Text style={[styles.loadingTitle, { fontSize: isMenuLandscape ? 36 : 40 }]}>{t.song}</Text>
+              <Text style={[styles.loadingTitle, { fontSize: isMenuLandscape ? 32 : 40 }]}>{t.song}</Text>
             </View>
 
-            <Text style={[styles.loadingSubtitle, { marginTop: 12, fontSize: 13 }]}>Indonesian Card Game</Text>
+            <Text style={[styles.loadingSubtitle, { marginTop: 12, fontSize: 13, textAlign: 'center' }]}>Indonesian Card Game</Text>
 
             {/* Decorative suits row */}
             <Animated.View entering={FadeIn.delay(600).duration(500)} style={{ flexDirection: 'row', gap: 16, marginTop: 14 }}>
@@ -425,7 +426,9 @@ export default function GameBoard() {
             { 
               marginTop: isMenuLandscape ? 0 : 40, 
               gap: isMenuLandscape ? 10 : 14,
-              maxWidth: isMenuLandscape ? 260 : 300,
+              flex: isMenuLandscape ? 1.2 : undefined,
+              width: isMenuLandscape ? undefined : '100%',
+              maxWidth: 300,
             }
           ]}>
             {/* Start Game — Primary CTA */}
