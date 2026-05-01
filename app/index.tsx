@@ -21,6 +21,7 @@ import { GameStatusBar } from '../components/GameStatusBar';
 import { GameLogSidebar } from '../components/GameLogSidebar';
 import { CustomDialog } from '../components/CustomDialog';
 import { useShallow } from 'zustand/react/shallow';
+import { MenuBackground } from '../components/MenuBackground';
 
 export default function GameBoard() {
   const [showRules, setShowRules] = useState(false);
@@ -348,16 +349,19 @@ export default function GameBoard() {
       ]}>
         <StatusBar hidden />
 
-        {/* Floating decorative card symbols */}
-        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+        {/* Modern Animated Gradient Background */}
+        <MenuBackground />
+
+        {/* Floating decorative card symbols (kept but with subtle opacity for depth) */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden', pointerEvents: 'none' }}>
           {['♠', '♥', '♦', '♣', '🃏', '♠', '♥', '♦', '♣'].map((sym, i) => (
             <Animated.Text
               key={i}
-              entering={FadeIn.delay(300 + i * 150).duration(800)}
+              entering={FadeIn.delay(300 + i * 150).duration(1500)}
               style={{
                 position: 'absolute',
-                fontSize: 20 + (i % 3) * 12,
-                color: sym === '♥' || sym === '♦' ? 'rgba(231,76,60,0.08)' : 'rgba(232,217,176,0.06)',
+                fontSize: 24 + (i % 3) * 16,
+                color: sym === '♥' || sym === '♦' ? 'rgba(231,76,60,0.12)' : 'rgba(255,255,255,0.06)',
                 top: `${10 + (i * 11) % 80}%`,
                 left: `${5 + (i * 13) % 85}%`,
                 transform: [{ rotate: `${-20 + i * 15}deg` }],
@@ -368,10 +372,22 @@ export default function GameBoard() {
           ))}
         </View>
 
-        {/* Main Content — responsive for landscape */}
-        <View style={isMenuLandscape ? {
-          flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 48, width: '100%', paddingHorizontal: 40,
-        } : { alignItems: 'center' }}>
+        {/* Main Content — Glassmorphism Container */}
+        <View style={[
+          isMenuLandscape ? {
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 48, paddingHorizontal: 40,
+          } : { alignItems: 'center' },
+          {
+            backgroundColor: 'rgba(15, 31, 21, 0.4)', // Glassmorphism base
+            borderRadius: 32,
+            padding: isMenuLandscape ? 30 : 40,
+            borderWidth: 1,
+            borderColor: 'rgba(255,255,255,0.1)',
+            overflow: 'hidden',
+          }
+        ]}>
+          {/* Glass Reflection effect */}
+          <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', backgroundColor: 'rgba(255,255,255,0.03)', borderTopLeftRadius: 32, borderTopRightRadius: 32 }} />
 
           {/* Title Section */}
           <Animated.View entering={FadeInDown.duration(600)} style={{ alignItems: 'center' }}>
