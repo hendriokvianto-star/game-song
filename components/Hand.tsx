@@ -7,7 +7,7 @@ import Animated, {
 import { Card as CardType } from '../logic/types';
 import { CardComponent } from './Card';
 import { useGameStore } from '../store/gameStore';
-
+import { getResponsiveCardSize } from '../app/styles';
 
 interface HandProps {
   cards: CardType[];
@@ -103,9 +103,9 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isLandscape = screenW > screenH && screenH < 500;
 
-  // U1: Dynamic card sizing — match table compact card dimensions
-  const CARD_WIDTH = isLandscape ? 36 : 44;
-  const MIN_VISIBLE_WIDTH = isLandscape ? 16 : 20;
+  // U1: Dynamic card sizing
+  const { width: CARD_WIDTH, height: CARD_HEIGHT } = getResponsiveCardSize(true, screenW, screenH);
+  const MIN_VISIBLE_WIDTH = Math.max(16, CARD_WIDTH * 0.45);
   
   // Calculate spacing but ensure a minimum visibility for each card
   const containerWidth = screenW - 32;
@@ -116,7 +116,7 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
 
   return (
-    <View style={[styles.container, { height: isLandscape ? 62 : 110, paddingBottom: isLandscape ? 0 : 8, paddingTop: isLandscape ? 10 : 8, paddingHorizontal: isLandscape ? 4 : 12, overflow: 'visible' }]}>
+    <View style={[styles.container, { height: isLandscape ? CARD_HEIGHT + 10 : CARD_HEIGHT + 44, paddingBottom: isLandscape ? 0 : 8, paddingTop: isLandscape ? 10 : 8, paddingHorizontal: isLandscape ? 4 : 12, overflow: 'visible' }]}>
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={isLandscape}

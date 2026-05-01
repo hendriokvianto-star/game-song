@@ -1,16 +1,11 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, Pressable, Platform, Dimensions } from 'react-native';
+import { View, Text, StyleSheet, Pressable, Platform, useWindowDimensions } from 'react-native';
 import Animated, { useAnimatedStyle, withSpring } from 'react-native-reanimated';
 import { Image } from 'expo-image';
 import * as Haptics from 'expo-haptics';
 import { Card as CardType } from '../logic/types';
 import { CardImages } from '../assets/cards';
-
-// Called at render time (not module scope) so it picks up current dimensions
-const getIsLandscape = () => {
-  const { width, height } = Dimensions.get('window');
-  return width > height && height < 500;
-};
+import { getResponsiveCardSize } from '../app/styles';
 
 const getCardImageSource = (card: CardType) => {
   if (card.rank === 'Joker') return CardImages['X1'];
@@ -39,6 +34,7 @@ interface CardProps {
 
 export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, onPress, isFaceUp = true, compact = false, selectionIndex, isHighlighted = false }) => {
   const [imageLoaded, setImageLoaded] = useState(false);
+  const { width: screenW, height: screenH } = useWindowDimensions();
   
   const animatedStyle = useAnimatedStyle(() => {
     return {
@@ -71,9 +67,7 @@ export const CardComponent: React.FC<CardProps> = ({ card, isSelected = false, o
     }
   };
 
-  const landscape = getIsLandscape();
-  let cardW = compact ? (landscape ? 36 : 44) : 60;
-  let cardH = compact ? (landscape ? 52 : 66) : 90;
+  const { width: cardW, height: cardH } = getResponsiveCardSize(compact, screenW, screenH);
 
   if (!isFaceUp) {
     return (

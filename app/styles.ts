@@ -4,6 +4,23 @@ import { StyleSheet, Dimensions, Platform } from 'react-native';
 const { width: staticW, height: staticH } = Dimensions.get('window');
 export const isLandscapeMobile = staticW > staticH && staticH < 500;
 
+export const getResponsiveCardSize = (compact: boolean, screenW: number, screenH: number) => {
+  const isLandscape = screenW > screenH && screenH < 500;
+  
+  if (isLandscape) {
+    // Make cards occupy ~22% of screen height in compact mode (good for tables)
+    // and ~30% in normal mode.
+    const h = compact ? Math.max(52, screenH * 0.24) : Math.max(66, screenH * 0.32);
+    const w = h * 0.69; // standard playing card ratio
+    return { width: w, height: h };
+  } else {
+    // In portrait, constrain by width
+    const w = compact ? Math.max(44, screenW * 0.12) : Math.max(60, screenW * 0.16);
+    const h = w * 1.45;
+    return { width: w, height: h };
+  }
+};
+
 export const THEMES = {
   classic: { primary: '#1e392a', secondary: '#2ecc71', background: '#0F1F15', border: 'rgba(46,204,113,0.15)' },
   luxury: { primary: '#4a1010', secondary: '#e67e22', background: '#1a0505', border: 'rgba(230,126,34,0.15)' },
