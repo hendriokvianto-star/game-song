@@ -99,15 +99,32 @@ export function TableSequences() {
                   )}
                 </View>
                 <View style={styles.sequenceCards}>
-                  {seq.map((card, cIdx) => (
-                    <AnimatedSequenceCard
-                      key={card.id}
-                      card={card}
-                      index={cIdx}
-                      isExpanded={isExpanded}
-                      isClosed={isSequenceComplete(seq)}
-                    />
-                  ))}
+                  {isSequenceComplete(seq) && !isExpanded ? (
+                    <View style={styles.deckCenterWrapper}>
+                      <View style={[styles.deckBase2, { position: 'absolute' }]}>
+                        <CardComponent card={seq[0]} isFaceUp={false} compact />
+                      </View>
+                      <View style={[styles.deckBase1, { position: 'absolute' }]}>
+                        <CardComponent card={seq[0]} isFaceUp={false} compact />
+                      </View>
+                      <View style={styles.deckTop}>
+                        <CardComponent card={seq[0]} isFaceUp={false} compact />
+                      </View>
+                      <View style={styles.remainingDeckBadge}>
+                        <Text style={styles.remainingDeckText}>{seq.length}</Text>
+                      </View>
+                    </View>
+                  ) : (
+                    seq.map((card, cIdx) => (
+                      <AnimatedSequenceCard
+                        key={card.id}
+                        card={card}
+                        index={cIdx}
+                        isExpanded={isExpanded}
+                        isClosed={false}
+                      />
+                    ))
+                  )}
                 </View>
               </View>
               {isExpanded && hints && (
