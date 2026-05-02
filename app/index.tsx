@@ -555,10 +555,7 @@ export default function GameBoard() {
       <StatusBar hidden />
       <View style={styles.mainRow}>
         <View style={styles.mainContent}>
-          <View style={[styles.header, { 
-            paddingLeft: Math.max(insets.left, isLandscapeMobile ? 10 : 16),
-            paddingRight: Math.max(insets.right, isLandscapeMobile ? 10 : 16)
-          }]}>
+          <View style={styles.header}>
             <Text style={styles.headerTitle}>🃏 Song</Text>
             <GameStatusBar />
             <View style={styles.headerRight}>
@@ -570,10 +567,7 @@ export default function GameBoard() {
           </View>
 
       {/* AI Opponents Row */}
-      <View style={[styles.opponentsRow, {
-        paddingLeft: Math.max(insets.left, isLandscapeMobile ? 3 : 8),
-        paddingRight: Math.max(insets.right, isLandscapeMobile ? 3 : 8)
-      }]}>
+      <View style={styles.opponentsRow}>
         {aiPlayers.map((ai) => (
           <AIPlayerBadge
             key={ai.id}
@@ -606,10 +600,7 @@ export default function GameBoard() {
 
       {/* Human Player Area */}
       {humanPlayer && (
-        <Animated.View entering={SlideInDown.duration(500)} style={[styles.humanArea, {
-          paddingLeft: Math.max(insets.left, isLandscapeMobile ? 8 : 16),
-          paddingRight: Math.max(insets.right, isLandscapeMobile ? 8 : 16)
-        }]}>
+        <Animated.View entering={SlideInDown.duration(500)} style={styles.humanArea}>
           {/* Player Info & Action Buttons */}
           <View style={styles.humanHeader}>
             <View style={styles.humanInfo}>
