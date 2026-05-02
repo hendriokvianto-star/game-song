@@ -549,15 +549,16 @@ export default function GameBoard() {
       { 
         backgroundColor: theme.background,
         paddingTop: insets.top,
-        paddingBottom: insets.bottom,
-        paddingLeft: insets.left,
-        paddingRight: insets.right
+        paddingBottom: insets.bottom
       }
     ]}>
       <StatusBar hidden />
       <View style={styles.mainRow}>
         <View style={styles.mainContent}>
-          <View style={styles.header}>
+          <View style={[styles.header, { 
+            paddingLeft: Math.max(insets.left, isLandscapeMobile ? 10 : 16),
+            paddingRight: Math.max(insets.right, isLandscapeMobile ? 10 : 16)
+          }]}>
             <Text style={styles.headerTitle}>🃏 Song</Text>
             <GameStatusBar />
             <View style={styles.headerRight}>
@@ -569,7 +570,10 @@ export default function GameBoard() {
           </View>
 
       {/* AI Opponents Row */}
-      <View style={styles.opponentsRow}>
+      <View style={[styles.opponentsRow, {
+        paddingLeft: Math.max(insets.left, isLandscapeMobile ? 3 : 8),
+        paddingRight: Math.max(insets.right, isLandscapeMobile ? 3 : 8)
+      }]}>
         {aiPlayers.map((ai) => (
           <AIPlayerBadge
             key={ai.id}
@@ -602,7 +606,10 @@ export default function GameBoard() {
 
       {/* Human Player Area */}
       {humanPlayer && (
-        <Animated.View entering={SlideInDown.duration(500)} style={styles.humanArea}>
+        <Animated.View entering={SlideInDown.duration(500)} style={[styles.humanArea, {
+          paddingLeft: Math.max(insets.left, isLandscapeMobile ? 8 : 16),
+          paddingRight: Math.max(insets.right, isLandscapeMobile ? 8 : 16)
+        }]}>
           {/* Player Info & Action Buttons */}
           <View style={styles.humanHeader}>
             <View style={styles.humanInfo}>
