@@ -1,4 +1,4 @@
-const { withAndroidStyles } = require('@expo/config-plugins');
+const { withAndroidStyles } = require('expo/config-plugins');
 
 module.exports = function withAndroidDisplayCutout(config) {
   return withAndroidStyles(config, async (config) => {
