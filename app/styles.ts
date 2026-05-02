@@ -8,9 +8,9 @@ export const getResponsiveCardSize = (compact: boolean, screenW: number, screenH
   const isLandscape = screenW > screenH && screenH < 500;
   
   if (isLandscape) {
-    // Make cards occupy ~22% of screen height in compact mode (good for tables)
-    // and ~30% in normal mode.
-    const h = compact ? Math.max(52, screenH * 0.24) : Math.max(66, screenH * 0.32);
+    // Make cards occupy ~20% of screen height in compact mode (good for tables)
+    // and ~26% in normal mode.
+    const h = compact ? Math.max(48, screenH * 0.20) : Math.max(60, screenH * 0.26);
     const w = h * 0.69; // standard playing card ratio
     return { width: w, height: h };
   } else {

@@ -22,6 +22,10 @@
       "predictiveBackGestureEnabled": false,
       "package": "com.hendriokvsorganization.songcard"
     },
+    "androidStatusBar": {
+      "translucent": true,
+      "hidden": true
+    },
     "web": {
       "output": "static",
       "favicon": "./assets/images/favicon.png"
