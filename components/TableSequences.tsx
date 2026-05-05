@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, ScrollView, Pressable } from 'react-native';
-import Animated, { ZoomIn, LinearTransition, useAnimatedStyle, withSpring } from 'react-native-reanimated';
+import Animated, { ZoomIn, LinearTransition, useAnimatedStyle, withSpring, FlipInYRight } from 'react-native-reanimated';
 import { useGameStore } from '../store/gameStore';
 import { translations } from '../logic/i18n';
 import { styles } from '../app/styles';
@@ -20,7 +20,6 @@ const AnimatedSequenceCard = React.memo(
       };
     }, [isExpanded, index]);
 
-    // Optimize: prevent recreating the animation object on every render
     const enteringAnim = React.useMemo(() => ZoomIn.delay(index * 50).duration(400).springify(), [index]);
 
     return (
@@ -43,16 +42,74 @@ const AnimatedSequenceCard = React.memo(
   }
 );
 
+// Reveal card with flip animation when transitioning from closed to open
+const RevealSequenceCard = React.memo(
+  ({ card, index, isExpanded }: { card: any, index: number, isExpanded: boolean }) => {
+    const animatedStyle = useAnimatedStyle(() => {
+      const margin = index > 0 ? (isExpanded ? 8 : -20) : 0;
+      return {
+        marginLeft: withSpring(margin, { damping: 14, stiffness: 150 })
+      };
+    }, [isExpanded, index]);
+
+    const flipAnim = React.useMemo(() => FlipInYRight.delay(index * 100).duration(600), [index]);
+
+    return (
+      <Animated.View 
+        style={animatedStyle} 
+        entering={flipAnim}
+        layout={SPRING_LAYOUT}
+      >
+        <CardComponent card={card} isFaceUp={true} compact />
+      </Animated.View>
+    );
+  },
+  (prevProps, nextProps) => {
+    return (
+      prevProps.card.id === nextProps.card.id &&
+      prevProps.index === nextProps.index &&
+      prevProps.isExpanded === nextProps.isExpanded
+    );
+  }
+);
+
 export function TableSequences() {
-  const { activeSequences, language, selectedCardIds, playSelectedCards } = useGameStore(useShallow(state => ({
+  const { activeSequences, language, selectedCardIds, playSelectedCards, allPlayersOpened } = useGameStore(useShallow(state => ({
     activeSequences: state.activeSequences,
     language: state.language,
     selectedCardIds: state.selectedCardIds,
-    playSelectedCards: state.playSelectedCards
+    playSelectedCards: state.playSelectedCards,
+    allPlayersOpened: state.allPlayersOpened,
   })));
   
   const t = translations[language];
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
+
+  // Track reveal state: cards stay face-down until allPlayersOpened,
+  // then after a short delay, flip face-up simultaneously
+  const [revealed, setRevealed] = useState(!!allPlayersOpened);
+  const [isRevealing, setIsRevealing] = useState(false);
+  const prevAllOpened = useRef(!!allPlayersOpened);
+
+  useEffect(() => {
+    if (allPlayersOpened && !prevAllOpened.current) {
+      // Transition: all players just finished opening → trigger reveal
+      setIsRevealing(true);
+      const timer = setTimeout(() => {
+        setRevealed(true);
+        setIsRevealing(false);
+      }, 1200);
+      prevAllOpened.current = true;
+      return () => clearTimeout(timer);
+    }
+    if (allPlayersOpened) {
+      prevAllOpened.current = true;
+      setRevealed(true);
+    }
+  }, [allPlayersOpened]);
+
+  // Sequences shown face-down until revealed
+  const showClosed = !revealed && !allPlayersOpened;
 
   const onSequencePress = (idx: number) => {
     if (selectedCardIds.length > 0) {
@@ -77,8 +134,7 @@ export function TableSequences() {
         <View style={styles.sequencesWrapContainer}>
         {activeSequences.map((seq, sIdx) => {
           const isExpanded = expandedIdx === sIdx;
-          // P6: Only compute hints when expanded (lazy)
-          const hints = isExpanded ? getSequenceHints(seq) : null;
+          const hints = isExpanded && revealed ? getSequenceHints(seq) : null;
 
           return (
             <Pressable key={sIdx} onPress={() => onSequencePress(sIdx)}>
@@ -114,6 +170,16 @@ export function TableSequences() {
                         <Text style={styles.remainingDeckText}>{seq.length}</Text>
                       </View>
                     </View>
+                  ) : isRevealing ? (
+                    // Reveal animation: flip cards face-up with staggered delay
+                    seq.map((card, cIdx) => (
+                      <RevealSequenceCard
+                        key={card.id}
+                        card={card}
+                        index={cIdx}
+                        isExpanded={isExpanded}
+                      />
+                    ))
                   ) : (
                     seq.map((card, cIdx) => (
                       <AnimatedSequenceCard
@@ -121,13 +187,13 @@ export function TableSequences() {
                         card={card}
                         index={cIdx}
                         isExpanded={isExpanded}
-                        isClosed={false}
+                        isClosed={showClosed}
                       />
                     ))
                   )}
                 </View>
               </View>
-              {isExpanded && hints && (
+              {isExpanded && hints && revealed && (
                 <View style={styles.hintPanel}>
                   <Text style={styles.hintTitle}>📌 {t.cardsToEnter}</Text>
                   <View style={styles.hintRow}>

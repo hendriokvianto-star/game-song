@@ -264,6 +264,44 @@ function isValueBlocked(val: number, activeSequences: Card[][]): boolean {
   return false;
 }
 
+/**
+ * Ensures played cards extend a sequence from only ONE side (low or high),
+ * not from both sides simultaneously.
+ * Example: [3,4,5] + [2,6] = INVALID (extends both sides)
+ *          [3,4,5] + [6,7] = VALID   (extends high side only)
+ *          [3,4,5] + [2,A] = VALID   (extends low side only)
+ */
+function isOneSideExtension(existingValues: number[], playedCards: Card[], combined: Card[]): boolean {
+  const playedRegulars = playedCards.filter(c => !c.isJoker);
+  if (playedRegulars.length <= 1) return true; // Single card or only jokers — always OK
+
+  const existingMin = Math.min(...existingValues);
+  const existingMax = Math.max(...existingValues);
+
+  // Determine Ace interpretation from the combined sequence context
+  const combinedRegulars = combined.filter(c => !c.isJoker);
+  let useAceAsOne = false;
+  if (combinedRegulars.some(c => c.rank === 'A')) {
+    const suit = combinedRegulars[0].suit;
+    const maxRange = suit === 'spades' ? 12 : 14;
+    const jCount = combined.filter(c => c.isJoker).length;
+    const v14 = validateSequenceValues(combinedRegulars.map(c => c.value), jCount, maxRange);
+    const v1 = validateSequenceValues(combinedRegulars.map(c => c.rank === 'A' ? 1 : c.value), jCount, 13);
+    if (v1 && !v14) useAceAsOne = true;
+  }
+
+  let hasLow = false;
+  let hasHigh = false;
+  for (const pr of playedRegulars) {
+    const prVal = (useAceAsOne && pr.rank === 'A') ? 1 : pr.value;
+    if (prVal < existingMin) hasLow = true;
+    if (prVal > existingMax) hasHigh = true;
+  }
+
+  // If cards are on BOTH sides of the existing sequence, reject
+  return !(hasLow && hasHigh);
+}
+
 export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], targetIndex: number): { valid: boolean, newSequence: Card[] } {
   if (targetIndex < 0 || targetIndex >= activeSequences.length) return { valid: false, newSequence: [] };
   
@@ -306,8 +344,12 @@ export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], t
        }
 
        if (!isReplacingJoker) {
-         return { valid: true, newSequence: sortSequence(combined) };
-       }
+          // Rule: cards must extend from one side only (not both ends)
+          if (!isOneSideExtension(prevValues, safePlayedCards, combined)) {
+            return { valid: false, newSequence: [] };
+          }
+          return { valid: true, newSequence: sortSequence(combined) };
+        }
     }
   } else if (isSameValueCombo(existing)) {
     if (isDeadSet(existing)) return { valid: false, newSequence: [] }; // Cannot extend already dead set
@@ -377,6 +419,11 @@ export const validatePlayMulti = (playedCards: Card[], activeSequences: Card[][]
 
       if (isReplacingJoker) {
         continue; // Cannot replace or shift a Joker
+      }
+
+      // Rule: cards must extend from one side only (not both ends simultaneously)
+      if (!isOneSideExtension(prevValues, playedCards, combined)) {
+        continue;
       }
 
       if (playedCards.length === 1) {
