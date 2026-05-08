@@ -247,7 +247,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       currentDealIndex++;
 
       // Trigger light haptic for the human player's card
-      if (playerIndex === 0 && currentDealIndex % 5 === 1) {
+      if (playerIndex === 0 && currentDealIndex % 5 === 1 && get().sfxEnabled) {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       }
 
@@ -496,7 +496,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     }
 
     if (!valid) {
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      if (get().sfxEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const t = translations[get().language];
       alert(targetIndex !== undefined 
         ? t.cardNotMatch
@@ -507,7 +507,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     // Check hasOpened and opening rules
     if (!currentPlayer.hasOpened) {
       if (sequenceIndex !== -1) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (get().sfxEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         alert(translations[get().language].mustOpenFirst);
         return false;
       }
@@ -517,13 +517,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
       const isSeq = isSequence(selectedCards);
       
       if (isSet && !isSeq && selectedCards.length < 5) {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        if (get().sfxEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         alert(translations[get().language].setMinFive);
         return false;
       }
     }
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (get().sfxEnabled) Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
     const newHand = currentPlayer.hand.filter(c => !state.selectedCardIds.includes(c.id));
     const newPlayers = [...state.players];
@@ -607,8 +607,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const wasSelected = state.selectedCardIds.includes(cardId);
     const originalSelection = [...state.selectedCardIds];
 
-    if (wasSelected && state.selectedCardIds.length >= 3) {
-      // Card is part of a group selection (3+) — play ALL selected cards as a group
+    if (wasSelected && state.selectedCardIds.length >= 2) {
+      // Card is part of a group selection (2+) — play ALL selected cards as a group
       const success = get().playSelectedCards();
       return success;
     }
@@ -630,7 +630,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const state = get();
     if (state.status !== 'playing' || state.players[state.currentPlayerIndex].isAI) return;
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+    if (get().sfxEnabled) Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
 
     // Instead of ending the game immediately, eliminate the player (mati) and let bots finish the match
     get().eliminateCurrentPlayer();

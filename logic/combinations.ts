@@ -547,6 +547,11 @@ export const extractSameValueCombo = (hand: Card[], minCount: number): { combo: 
 };
 
 export const checkJackpotSong = (hand: Card[]): boolean => {
+  // Special case: all Jokers (e.g. 3 Jokers) — valid Song as seri kembar
+  if (hand.length >= 3 && hand.every(c => c.isJoker)) {
+    return true;
+  }
+
   // Try to exhaust hand by extracting all possible sequences first
   let { remainingHand } = extractAllSequences(hand);
   
@@ -586,6 +591,13 @@ export const calculateWinnerBonus = (finalMeld: Card[], isAttachment?: boolean):
   }
   
   const hasJoker = finalMeld.some(c => c.isJoker);
+  const allJokers = finalMeld.every(c => c.isJoker);
+  
+  // Special case: all Jokers (e.g. 3 Jokers) — treated as seri kembar with Joker
+  if (allJokers && finalMeld.length >= 3) {
+    return -100;
+  }
+  
   const isSeq = isSequence(finalMeld);
   const isSet = isSameValueCombo(finalMeld);
   

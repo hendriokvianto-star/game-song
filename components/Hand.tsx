@@ -56,7 +56,7 @@ function DraggableCard({
     }
   }, [card.id, onPlayDrag]);
 
-  const isGroupCard = isSelected && selectedCount >= 3;
+  const isGroupCard = isSelected && selectedCount >= 2;
 
   const pan = Gesture.Pan()
     .minDistance(5)
@@ -151,8 +151,8 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
 
-  // Drag hint when 3+ cards selected
-  const showDragHint = selectedCardIds.length >= 3;
+  // Drag hint when 2+ cards selected
+  const showDragHint = selectedCardIds.length >= 2;
 
   return (
     <View style={[styles.container, { height: isLandscape ? CARD_HEIGHT + 10 : CARD_HEIGHT + 44, paddingBottom: isLandscape ? 0 : 8, paddingTop: isLandscape ? 10 : 8, paddingHorizontal: isLandscape ? 4 : 12, overflow: 'visible' }]}>
