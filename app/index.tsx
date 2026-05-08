@@ -32,7 +32,8 @@ export default function GameBoard() {
     playSelectedCards, passTurn, activeSequences, executeAITurn,
     selectedCardIds, ceremonyWinnerId, currentHint, provideHint, clearHint,
     currentTheme, setTheme, sfxTrigger, language, setLanguage,
-    tutorialStep, startTutorial
+    tutorialStep, startTutorial,
+    sfxEnabled, bgmEnabled, toggleSFX, toggleBGM
   } = useGameStore();
   const theme = THEMES[currentTheme];
   const t = translations[language];
@@ -45,6 +46,7 @@ export default function GameBoard() {
 
   const playBGM = async () => {
     if (soundRef.current) return;
+    if (!bgmEnabled) return; // Respect BGM setting
     try {
       const { sound: newSound } = await Audio.Sound.createAsync(
         require('../assets/sounds/bgm.mp3'),
@@ -63,7 +65,9 @@ export default function GameBoard() {
       soundRef.current.unloadAsync();
       soundRef.current = null;
       setIsMusicPlaying(false);
+      if (bgmEnabled) toggleBGM(); // Sync store
     } else {
+      if (!bgmEnabled) toggleBGM(); // Sync store
       playBGM();
     }
   };
@@ -131,6 +135,7 @@ export default function GameBoard() {
   useEffect(() => {
     async function playSFX() {
       if (!sfxTrigger) return;
+      if (!sfxEnabled) return; // Respect SFX setting
       try {
         let source;
         let volume = 0.6;
@@ -162,7 +167,7 @@ export default function GameBoard() {
       }
     }
     playSFX();
-  }, [sfxTrigger]);
+  }, [sfxTrigger, sfxEnabled]);
 
   useEffect(() => {
     // Game will wait for user to press Start
@@ -326,6 +331,37 @@ export default function GameBoard() {
               }}>
                 <Text style={{ color: isMusicPlaying ? '#0F1F15' : 'rgba(255,255,255,0.5)', fontWeight: '800', fontSize: 11 }}>
                   {isMusicPlaying ? t.settingsMusicOn : t.settingsMusicOff}
+                </Text>
+              </View>
+            </Pressable>
+
+            {/* SFX */}
+            <Text style={{ color: 'rgba(232,217,176,0.5)', fontSize: 11, fontWeight: '700', letterSpacing: 2, marginBottom: 10, marginTop: isSettingsLandscape ? 20 : 24, textTransform: 'uppercase' }}>
+              Sound Effects (SFX)
+            </Text>
+            <Pressable
+              onPress={toggleSFX}
+              style={({ pressed }) => ({
+                flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+                backgroundColor: sfxEnabled ? 'rgba(52,152,219,0.12)' : 'rgba(255,255,255,0.04)',
+                borderWidth: 1,
+                borderColor: sfxEnabled ? 'rgba(52,152,219,0.3)' : 'rgba(255,255,255,0.08)',
+                borderRadius: 12, paddingHorizontal: 16, paddingVertical: isSettingsLandscape ? 10 : 14,
+                transform: [{ scale: pressed ? 0.97 : 1 }],
+              })}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                <Text style={{ fontSize: 20 }}>{sfxEnabled ? '🔊' : '🔇'}</Text>
+                <Text style={{ color: sfxEnabled ? '#3498db' : 'rgba(255,255,255,0.5)', fontWeight: '600', fontSize: 15 }}>
+                  SFX
+                </Text>
+              </View>
+              <View style={{
+                backgroundColor: sfxEnabled ? '#3498db' : 'rgba(255,255,255,0.15)',
+                paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12,
+              }}>
+                <Text style={{ color: sfxEnabled ? '#0F1F15' : 'rgba(255,255,255,0.5)', fontWeight: '800', fontSize: 11 }}>
+                  {sfxEnabled ? t.settingsMusicOn : t.settingsMusicOff}
                 </Text>
               </View>
             </Pressable>
@@ -590,6 +626,9 @@ export default function GameBoard() {
 
       {/* Table — Sequences */}
       <View style={[styles.tableArea, { backgroundColor: theme.primary + '99', borderColor: theme.border }]}>
+        {/* Inner glow overlay for premium feel */}
+        <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: '40%', backgroundColor: 'rgba(255,255,255,0.02)', borderTopLeftRadius: 20, borderTopRightRadius: 20 }} />
+        <View style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: '30%', backgroundColor: 'rgba(0,0,0,0.15)', borderBottomLeftRadius: 20, borderBottomRightRadius: 20 }} />
         {status !== 'dealing' && (
           <>
             <RemainingDeck />
@@ -600,7 +639,13 @@ export default function GameBoard() {
 
       {/* Human Player Area */}
       {humanPlayer && (
-        <Animated.View entering={SlideInDown.duration(500)} style={styles.humanArea}>
+        <Animated.View entering={SlideInDown.duration(500)} style={[
+          styles.humanArea,
+          isHumanTurn && !isHumanFinished && {
+            borderTopColor: theme.secondary + '40',
+            borderTopWidth: 2,
+          }
+        ]}>
           {/* Player Info & Action Buttons */}
           <View style={styles.humanHeader}>
             <View style={styles.humanInfo}>

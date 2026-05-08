@@ -76,6 +76,8 @@ export const translations = {
     jackpot: 'JACKPOT! 🎰',
     cardsFinished: 'Kartu telah habis!',
     redeal: 'REDEAL: 2+ pemain deadlock! Membagikan ulang...',
+    remainingHands: 'KARTU DI TANGAN',
+    noCardsLeft: 'Habis',
     tutorialSteps: [
       { title: 'Selamat Datang!', desc: 'Mari pelajari cara bermain Song. Game ini menggunakan 2 dek kartu dan 4 lawan bot.' },
       { title: 'Lawan Bot', desc: 'Di atas adalah lawan Anda. Angka menunjukkan sisa kartu mereka. Jangan sampai mereka habis lebih dulu!' },
@@ -181,6 +183,8 @@ export const translations = {
     jackpot: 'JACKPOT! 🎰',
     cardsFinished: 'All cards played!',
     redeal: 'REDEAL: 2+ players deadlocked! Re-dealing...',
+    remainingHands: 'CARDS IN HAND',
+    noCardsLeft: 'Empty',
     tutorialSteps: [
       { title: 'Welcome!', desc: 'Let\'s learn how to play Song. This game uses 2 decks and 4 bot opponents.' },
       { title: 'Bot Opponents', desc: 'These are your rivals. The numbers show their remaining cards. Don\'t let them finish first!' },

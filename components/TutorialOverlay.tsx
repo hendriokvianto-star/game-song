@@ -32,12 +32,12 @@ export function TutorialOverlay() {
   const usableRight = insets.right;
   const usableTop = insets.top;
 
-  // Calculate dynamic card sizes to align highlights correctly
+  // Proportional layout measurements (adapts to screen size)
   const { height: cardH } = getResponsiveCardSize(true, screenW, screenH);
 
-  const headerH = isLandscape ? 13 : 36;
-  const botsH = isLandscape ? 32 : 90;
-  const humanHeaderH = isLandscape ? 28 : 48; // Button bar actual height including padding
+  const headerH = isLandscape ? 14 : Math.max(36, screenH * 0.045);
+  const botsH = isLandscape ? 34 : Math.max(80, screenH * 0.11);
+  const humanHeaderH = isLandscape ? 30 : Math.max(44, screenH * 0.055);
   const handH = isLandscape ? cardH + 10 : cardH + 44;
 
   const botsTop = usableTop + headerH;

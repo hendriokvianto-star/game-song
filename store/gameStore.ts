@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { Card, GameState, Player, Suit } from '../logic/types';
+import { Card, GameState, Player, Rank, Suit } from '../logic/types';
 import { Language, translations } from '../logic/i18n';
 import { createDeck, shuffle, deal } from '../logic/game-engine';
 import { validatePlayMulti, validatePlayAt, extractAllSequences, extractSameValueCombo, isSequence, isSameValueCombo, calculateHandValue, calculateWinnerBonus, checkJackpotSong } from '../logic/combinations';
@@ -16,6 +16,8 @@ interface GameStore extends GameState {
   currentHint: { message: string, cardIds: string[] } | null;
   currentTheme: 'classic' | 'luxury' | 'ocean' | 'midnight';
   sfxTrigger: { type: 'draw' | 'play' | 'win' | 'mati' | 'deal', timestamp: number } | null;
+  sfxEnabled: boolean;
+  bgmEnabled: boolean;
   language: Language;
   tutorialStep: number | null;
   dialogConfig: { title: string; message: string; actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }[] } | null;
@@ -38,6 +40,8 @@ interface GameStore extends GameState {
   clearHint: () => void;
   setTheme: (theme: 'classic' | 'luxury' | 'ocean' | 'midnight') => void;
   triggerSFX: (type: 'draw' | 'play' | 'win' | 'mati' | 'deal') => void;
+  toggleSFX: () => void;
+  toggleBGM: () => void;
   setLanguage: (lang: Language) => void;
   startTutorial: () => void;
   nextTutorialStep: () => void;
@@ -153,6 +157,8 @@ export const useGameStore = create<GameStore>((set, get) => ({
   currentHint: null,
   currentTheme: 'classic',
   sfxTrigger: null,
+  sfxEnabled: true,
+  bgmEnabled: true,
   language: 'id',
   tutorialStep: null,
   dialogConfig: null,
@@ -525,6 +531,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     const { nextPlayerIndex, newAllPlayersOpened } = determineNextTurn(state, newPlayers, newStatus);
 
+      const isOpeningMove = !currentPlayer.hasOpened;
       const formatSuit = (s: string) => s === 'none' ? '' : s;
       const cardNames = selectedCards.map(c => c.isJoker ? 'Joker' : `${c.rank} ${formatSuit(c.suit)}`).join(', ');
       const t = translations[get().language];
@@ -539,7 +546,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         winnerId: newWinnerId,
         status: newStatus,
         lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
-        playHistory: [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
+        playHistory: isOpeningMove ? state.playHistory : [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
         consecutivePasses: 0,
         allPlayersOpened: newAllPlayersOpened,
       });
@@ -689,6 +696,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
       const { nextPlayerIndex, newAllPlayersOpened } = determineNextTurn(state, newPlayers, newStatus);
 
+      const isOpeningMove = !currentPlayer.hasOpened;
       const formatSuit = (s: string) => s === 'none' ? '' : s;
       const cardNames = cardsToPlay.map(c => c.isJoker ? 'Joker' : `${c.rank} ${formatSuit(c.suit)}`).join(', ');
       const t = translations[get().language];
@@ -702,7 +710,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
         winnerId: newWinnerId,
         status: newStatus as any,
         lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
-        playHistory: [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
+        playHistory: isOpeningMove ? state.playHistory : [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
         consecutivePasses: 0,
         allPlayersOpened: newAllPlayersOpened,
       });
@@ -816,7 +824,16 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   triggerSFX: (type) => {
+    if (!get().sfxEnabled) return; // Respect SFX setting
     set({ sfxTrigger: { type, timestamp: Date.now() } });
+  },
+
+  toggleSFX: () => {
+    set({ sfxEnabled: !get().sfxEnabled });
+  },
+
+  toggleBGM: () => {
+    set({ bgmEnabled: !get().bgmEnabled });
   },
 
   setLanguage: (lang) => {
@@ -824,13 +841,34 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   startTutorial: () => {
-    // Initialize mock players so the board has something to show
+    // Realistic varied mock cards for tutorial display
+    const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+    const ranks: Rank[] = ['3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K', 'A'];
+    const makeMockHand = (prefix: string): Card[] => {
+      const hand: Card[] = [];
+      for (let i = 0; i < 19; i++) {
+        const suit = suits[i % 4];
+        const rank = ranks[i % ranks.length];
+        const value = ranks.indexOf(rank) + 3;
+        hand.push({ id: `${prefix}-${i}`, suit, rank, value });
+      }
+      // Add a Joker to make it realistic
+      hand.push({ id: `${prefix}-joker`, suit: 'none', rank: 'Joker', value: 0, isJoker: true });
+      return hand;
+    };
+    // Sort human hand by suit then value for display
+    const humanHand = makeMockHand('m1').sort((a, b) => {
+      if (a.isJoker) return 1;
+      if (b.isJoker) return -1;
+      if (a.suit !== b.suit) return a.suit.localeCompare(b.suit);
+      return a.value - b.value;
+    });
     const mockPlayers: Player[] = [
-      { id: 'p1', name: 'You', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m1-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: false, totalScore: 0 },
-      { id: 'p2', name: 'Bot 1', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m2-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
-      { id: 'p3', name: 'Bot 2', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m3-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
-      { id: 'p4', name: 'Bot 3', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m4-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
-      { id: 'p5', name: 'Bot 4', hand: Array.from({ length: 20 }, (_, i) => ({ id: `m5-${i}`, suit: 'hearts', rank: 'A', value: 14 })), isAI: true, totalScore: 0 },
+      { id: 'p1', name: 'You', hand: humanHand, isAI: false, totalScore: 0 },
+      { id: 'p2', name: 'Bot 1', hand: makeMockHand('m2'), isAI: true, totalScore: 45 },
+      { id: 'p3', name: 'Bot 2', hand: makeMockHand('m3'), isAI: true, totalScore: 120 },
+      { id: 'p4', name: 'Bot 3', hand: makeMockHand('m4'), isAI: true, totalScore: 30 },
+      { id: 'p5', name: 'Bot 4', hand: makeMockHand('m5'), isAI: true, totalScore: 85 },
     ];
     set({ 
       tutorialStep: 0,
@@ -840,9 +878,15 @@ export const useGameStore = create<GameStore>((set, get) => ({
   },
 
   nextTutorialStep: () => {
-    set((state) => ({ 
-      tutorialStep: state.tutorialStep !== null ? state.tutorialStep + 1 : null 
-    }));
+    const state = get();
+    if (state.tutorialStep === null) return;
+    const totalSteps = translations[state.language].tutorialSteps.length;
+    if (state.tutorialStep + 1 >= totalSteps) {
+      // Reached the end — close tutorial cleanly
+      set({ tutorialStep: null });
+    } else {
+      set({ tutorialStep: state.tutorialStep + 1 });
+    }
   },
 
   closeTutorial: () => {
