@@ -545,7 +545,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         finishCount: newFinishCount,
         winnerId: newWinnerId,
         status: newStatus,
-        lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
+        lastPlayInfo: isOpeningMove 
+          ? { playerName: currentPlayer.name, message: `${currentPlayer.name} ${t.openingCards}` }
+          : { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
         playHistory: isOpeningMove ? state.playHistory : [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
         consecutivePasses: 0,
         allPlayersOpened: newAllPlayersOpened,
@@ -709,7 +711,9 @@ export const useGameStore = create<GameStore>((set, get) => ({
         finishCount: newFinishCount,
         winnerId: newWinnerId,
         status: newStatus as any,
-        lastPlayInfo: { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
+        lastPlayInfo: isOpeningMove 
+          ? { playerName: currentPlayer.name, message: `${currentPlayer.name} ${t.openingCards}` }
+          : { playerName: currentPlayer.name, message: `${currentPlayer.name} ${actionMessage}` },
         playHistory: isOpeningMove ? state.playHistory : [{ id: Math.random().toString(36).substr(2, 9), message: `${currentPlayer.name} ${actionMessage}`, timestamp: Date.now() }, ...state.playHistory],
         consecutivePasses: 0,
         allPlayersOpened: newAllPlayersOpened,
