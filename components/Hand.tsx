@@ -1,8 +1,9 @@
 import React, { useCallback } from 'react';
-import { View, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, useWindowDimensions } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
-  useSharedValue, useAnimatedStyle, withSpring, runOnJS, FadeInDown, LinearTransition, withSequence, withTiming
+  useSharedValue, useAnimatedStyle, withSpring, runOnJS, FadeInDown, LinearTransition, withSequence, withTiming,
+  SharedValue
 } from 'react-native-reanimated';
 import { Card as CardType } from '../logic/types';
 import { CardComponent } from './Card';
@@ -15,7 +16,8 @@ interface HandProps {
 }
 
 function DraggableCard({
-  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted, spacing, isLandscape
+  card, index, totalCards, isSelected, onSelect, onReorder, onPlayDrag, isFaceUp, selectionIndex, isHighlighted, spacing, isLandscape,
+  groupDragY, isGroupDragging, selectedCount
 }: {
   card: CardType;
   index: number;
@@ -29,6 +31,9 @@ function DraggableCard({
   isHighlighted?: boolean;
   spacing: number;
   isLandscape?: boolean;
+  groupDragY: SharedValue<number>;
+  isGroupDragging: SharedValue<boolean>;
+  selectedCount: number;
 }) {
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
@@ -51,17 +56,32 @@ function DraggableCard({
     }
   }, [card.id, onPlayDrag]);
 
+  const isGroupCard = isSelected && selectedCount >= 3;
+
   const pan = Gesture.Pan()
     .minDistance(5)
-    .onStart(() => { isDragging.value = true; })
+    .onStart(() => { 
+      isDragging.value = true;
+      if (isGroupCard) {
+        isGroupDragging.value = true;
+      }
+    })
     .onUpdate((e) => {
-      translateX.value = e.translationX;
-      translateY.value = e.translationY;
+      if (isGroupCard) {
+        // Group drag — share Y position across all selected cards
+        groupDragY.value = e.translationY;
+        translateX.value = e.translationX * 0.3; // Slight X movement
+      } else {
+        translateX.value = e.translationX;
+        translateY.value = e.translationY;
+      }
     })
     .onEnd(() => {
-      if (translateY.value < dragThreshold) {
+      const finalY = isGroupCard ? groupDragY.value : translateY.value;
+      
+      if (finalY < dragThreshold) {
         runOnJS(doPlayDrag)();
-      } else {
+      } else if (!isGroupCard) {
         const moved = Math.round(translateX.value / spacing);
         if (moved !== 0) {
           const target = Math.max(0, Math.min(totalCards - 1, index + moved));
@@ -70,20 +90,32 @@ function DraggableCard({
       }
       translateX.value = withSpring(0, { damping: 20, stiffness: 200 });
       translateY.value = withSpring(0, { damping: 20, stiffness: 200 });
+      if (isGroupCard) {
+        groupDragY.value = withSpring(0, { damping: 20, stiffness: 200 });
+        isGroupDragging.value = false;
+      }
       isDragging.value = false;
     });
 
   const tap = Gesture.Tap().onEnd(() => { runOnJS(doSelect)(); });
   const gesture = Gesture.Exclusive(pan, tap);
 
-  const animStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translateX.value + shakeOffset.value },
-      { translateY: translateY.value + (isSelected ? selectedLift : 0) },
-      { scale: isDragging.value ? 1.08 : 1 },
-    ],
-    zIndex: isDragging.value ? 100 : 1,
-  }), [isSelected, selectedLift]);
+  const animStyle = useAnimatedStyle(() => {
+    const isBeingGroupDragged = isGroupCard && isGroupDragging.value;
+    
+    return {
+      transform: [
+        { translateX: translateX.value + shakeOffset.value },
+        { translateY: isBeingGroupDragged 
+            ? groupDragY.value + selectedLift 
+            : translateY.value + (isSelected ? selectedLift : 0) 
+        },
+        { scale: isDragging.value ? 1.08 : (isBeingGroupDragged ? 1.05 : 1) },
+      ],
+      zIndex: isDragging.value ? 100 : (isBeingGroupDragged ? 50 : 1),
+      opacity: isBeingGroupDragged ? 0.9 : 1,
+    };
+  }, [isSelected, selectedLift, isGroupCard]);
 
   return (
     <GestureDetector gesture={gesture}>
@@ -103,6 +135,10 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   const { width: screenW, height: screenH } = useWindowDimensions();
   const isLandscape = screenW > screenH && screenH < 500;
 
+  // Shared values for group drag synchronization
+  const groupDragY = useSharedValue(0);
+  const isGroupDragging = useSharedValue(false);
+
   // U1: Dynamic card sizing
   const { width: CARD_WIDTH, height: CARD_HEIGHT } = getResponsiveCardSize(true, screenW, screenH);
   const MIN_VISIBLE_WIDTH = Math.max(16, CARD_WIDTH * 0.45);
@@ -115,8 +151,20 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
   
   const finalSpacing = Math.max(MIN_VISIBLE_WIDTH, idealSpacing);
 
+  // Drag hint when 3+ cards selected
+  const showDragHint = selectedCardIds.length >= 3;
+
   return (
     <View style={[styles.container, { height: isLandscape ? CARD_HEIGHT + 10 : CARD_HEIGHT + 44, paddingBottom: isLandscape ? 0 : 8, paddingTop: isLandscape ? 10 : 8, paddingHorizontal: isLandscape ? 4 : 12, overflow: 'visible' }]}>
+      {/* Drag hint indicator */}
+      {showDragHint && isCurrentPlayer && (
+        <Animated.View 
+          entering={FadeInDown.duration(200)}
+          style={styles.dragHintContainer}
+        >
+          <Text style={styles.dragHintText}>⬆ Drag ke meja</Text>
+        </Animated.View>
+      )}
       <ScrollView 
         horizontal 
         showsHorizontalScrollIndicator={isLandscape}
@@ -150,6 +198,9 @@ export const Hand: React.FC<HandProps> = ({ cards, isCurrentPlayer = false }) =>
                 isHighlighted={currentHint?.cardIds.includes(card.id)}
                 spacing={finalSpacing}
                 isLandscape={isLandscape}
+                groupDragY={groupDragY}
+                isGroupDragging={isGroupDragging}
+                selectedCount={selectedCardIds.length}
               />
             </View>
           );
@@ -170,5 +221,23 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     justifyContent: 'center',
     width: '100%',
+  },
+  dragHintContainer: {
+    position: 'absolute',
+    top: -6,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(46,204,113,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: 'rgba(46,204,113,0.4)',
+    zIndex: 200,
+  },
+  dragHintText: {
+    color: '#2ecc71',
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
 });

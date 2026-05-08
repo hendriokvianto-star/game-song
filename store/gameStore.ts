@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { Card, GameState, Player, Rank, Suit } from '../logic/types';
 import { Language, translations } from '../logic/i18n';
 import { createDeck, shuffle, deal } from '../logic/game-engine';
-import { validatePlayMulti, validatePlayAt, extractAllSequences, extractSameValueCombo, isSequence, isSameValueCombo, calculateHandValue, calculateWinnerBonus, checkJackpotSong } from '../logic/combinations';
+import { validatePlayMulti, validatePlayAt, extractAllSequences, extractSameValueCombo, isSequence, isSequenceComplete, isSameValueCombo, calculateHandValue, calculateWinnerBonus, checkJackpotSong } from '../logic/combinations';
 import { AIBot } from '../logic/ai-engine';
 import * as Haptics from 'expo-haptics';
 
@@ -21,13 +21,15 @@ interface GameStore extends GameState {
   language: Language;
   tutorialStep: number | null;
   dialogConfig: { title: string; message: string; actions: { text: string; onPress?: () => void; style?: 'cancel' | 'destructive' | 'default' }[] } | null;
+  jokerPlacementPending: { targetIndex: number | undefined; selectedCardIds: string[] } | null;
 
   // Actions
   initializeGame: () => void;
   executeOpeningPhase: () => void;
   toggleCardSelection: (cardId: string) => void;
-  playSelectedCards: (targetIndex?: number) => boolean;
+  playSelectedCards: (targetIndex?: number, jokerPosition?: 'start' | 'end') => boolean;
   playDraggedCard: (cardId: string) => boolean;
+  confirmJokerPlacement: (position: 'start' | 'end') => void;
   passTurn: () => void;
   executeAITurn: () => void;
   restartGame: () => void;
@@ -162,6 +164,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   language: 'id',
   tutorialStep: null,
   dialogConfig: null,
+  jokerPlacementPending: null,
 
   allPlayersOpened: false,
   currentRound: 1,
@@ -424,7 +427,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
     });
   },
 
-  playSelectedCards: (targetIndex?: number): boolean => {
+  playSelectedCards: (targetIndex?: number, jokerPosition?: 'start' | 'end'): boolean => {
     const state = get();
     if (state.status !== 'playing' || state.players[state.currentPlayerIndex].isAI) return false;
 
@@ -435,12 +438,53 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
     if (selectedCards.length === 0) return false;
 
+    // Detect if attaching Joker(s) to an existing sequence — ask user for position
+    const hasJoker = selectedCards.some(c => c.isJoker);
+    const allJokers = selectedCards.every(c => c.isJoker);
+    
+    if (hasJoker && !jokerPosition) {
+      // Check if this would attach to an existing sequence (not creating a new one)
+      let wouldAttachToSeq = false;
+      let detectedTargetIndex = targetIndex;
+
+      if (targetIndex !== undefined && typeof targetIndex === 'number') {
+        // Direct target — check if it's a sequence type
+        const existing = state.activeSequences[targetIndex];
+        if (existing && isSequence(existing) && !isSequenceComplete(existing)) {
+          wouldAttachToSeq = true;
+        }
+      } else {
+        // Auto-detect — check if validatePlayMulti would attach to a sequence
+        const res = validatePlayMulti(selectedCards, state.activeSequences);
+        if (res.valid && res.sequenceIndex >= 0) {
+          const existing = state.activeSequences[res.sequenceIndex];
+          if (existing && isSequence(existing)) {
+            wouldAttachToSeq = true;
+            detectedTargetIndex = res.sequenceIndex;
+          }
+        }
+      }
+
+      if (wouldAttachToSeq) {
+        // Show dialog to pick position
+        const t = translations[get().language];
+        set({ 
+          jokerPlacementPending: { targetIndex: detectedTargetIndex, selectedCardIds: [...state.selectedCardIds] }
+        });
+        get().showDialog(t.jokerPlaceTitle, t.jokerPlaceMsg, [
+          { text: t.jokerStart, onPress: () => get().confirmJokerPlacement('start') },
+          { text: t.jokerEnd, onPress: () => get().confirmJokerPlacement('end'), style: 'default' },
+        ]);
+        return false; // Deferred — will be resolved by confirmJokerPlacement
+      }
+    }
+
     let valid = false;
     let sequenceIndex = -1;
     let newSequence: Card[] = [];
 
     if (targetIndex !== undefined && typeof targetIndex === 'number') {
-      const res = validatePlayAt(selectedCards, state.activeSequences, targetIndex);
+      const res = validatePlayAt(selectedCards, state.activeSequences, targetIndex, jokerPosition);
       valid = res.valid;
       sequenceIndex = targetIndex;
       newSequence = res.newSequence;
@@ -563,6 +607,13 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const wasSelected = state.selectedCardIds.includes(cardId);
     const originalSelection = [...state.selectedCardIds];
 
+    if (wasSelected && state.selectedCardIds.length >= 3) {
+      // Card is part of a group selection (3+) — play ALL selected cards as a group
+      const success = get().playSelectedCards();
+      return success;
+    }
+
+    // Single card drag — select it and try to play
     if (!wasSelected) {
       set({ selectedCardIds: [cardId] });
     }
@@ -821,6 +872,21 @@ export const useGameStore = create<GameStore>((set, get) => ({
 
   hideDialog: () => {
     set({ dialogConfig: null });
+  },
+
+  confirmJokerPlacement: (position: 'start' | 'end') => {
+    const pending = get().jokerPlacementPending;
+    if (!pending) return;
+    
+    // Restore selection and clear pending state
+    set({ 
+      selectedCardIds: pending.selectedCardIds,
+      jokerPlacementPending: null,
+      dialogConfig: null,
+    });
+    
+    // Now play with the chosen position
+    get().playSelectedCards(pending.targetIndex, position);
   },
 
   setTheme: (theme) => {

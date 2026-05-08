@@ -78,6 +78,10 @@ export const translations = {
     redeal: 'REDEAL: 2+ pemain deadlock! Membagikan ulang...',
     remainingHands: 'KARTU DI TANGAN',
     noCardsLeft: 'Habis',
+    jokerPlaceTitle: 'Posisi Joker',
+    jokerPlaceMsg: 'Letakkan Joker di posisi mana?',
+    jokerStart: '⬅ Awal Seri',
+    jokerEnd: 'Akhir Seri ➡',
     tutorialSteps: [
       { title: 'Selamat Datang!', desc: 'Mari pelajari cara bermain Song. Game ini menggunakan 2 dek kartu dan 4 lawan bot.' },
       { title: 'Lawan Bot', desc: 'Di atas adalah lawan Anda. Angka menunjukkan sisa kartu mereka. Jangan sampai mereka habis lebih dulu!' },
@@ -185,6 +189,10 @@ export const translations = {
     redeal: 'REDEAL: 2+ players deadlocked! Re-dealing...',
     remainingHands: 'CARDS IN HAND',
     noCardsLeft: 'Empty',
+    jokerPlaceTitle: 'Joker Position',
+    jokerPlaceMsg: 'Where to place the Joker?',
+    jokerStart: '⬅ Start',
+    jokerEnd: 'End ➡',
     tutorialSteps: [
       { title: 'Welcome!', desc: 'Let\'s learn how to play Song. This game uses 2 decks and 4 bot opponents.' },
       { title: 'Bot Opponents', desc: 'These are your rivals. The numbers show their remaining cards. Don\'t let them finish first!' },

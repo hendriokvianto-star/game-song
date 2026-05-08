@@ -140,7 +140,7 @@ export const isDeadSet = (cards: Card[]): boolean => {
   return isSameValueCombo(cards) && cards.some(c => c.isDead);
 };
 
-export const sortSequence = (cards: Card[]): Card[] => {
+export const sortSequence = (cards: Card[], jokerPosition: 'start' | 'end' = 'end'): Card[] => {
   const jokers = cards.filter(c => c.isJoker);
   const regulars = cards.filter(c => !c.isJoker);
   const lockedJokers = jokers.filter(j => j.assignedValue !== undefined);
@@ -199,13 +199,21 @@ export const sortSequence = (cards: Card[]): Card[] => {
   const suit = sortedRegulars.length > 0 ? sortedRegulars[0].suit : 'none';
   const maxVal = suit === 'spades' ? 13 : (useAceAsOne ? 13 : 14);
 
+  // Place remaining free Jokers based on jokerPosition preference
   while (jokerIdx < freeJokers.length) {
-    if (currentVal <= maxVal) {
-      result.push(freeJokers[jokerIdx]);
-      currentVal++;
-    } else {
+    if (jokerPosition === 'start') {
+      // User chose START — place Joker before the sequence
       result.unshift(freeJokers[jokerIdx]);
-      startVal--; // Update start value because we unshifted
+      startVal--;
+    } else {
+      // User chose END (default) — place Joker after the sequence
+      if (currentVal <= maxVal) {
+        result.push(freeJokers[jokerIdx]);
+        currentVal++;
+      } else {
+        result.unshift(freeJokers[jokerIdx]);
+        startVal--;
+      }
     }
     jokerIdx++;
   }
@@ -292,7 +300,7 @@ function isOneSideExtension(existingSeq: Card[], playedCards: Card[], combinedSe
   return !(extendsLow && extendsHigh);
 }
 
-export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], targetIndex: number): { valid: boolean, newSequence: Card[] } {
+export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], targetIndex: number, jokerPosition: 'start' | 'end' = 'end'): { valid: boolean, newSequence: Card[] } {
   if (targetIndex < 0 || targetIndex >= activeSequences.length) return { valid: false, newSequence: [] };
   
   const existing = activeSequences[targetIndex];
@@ -338,7 +346,7 @@ export function validatePlayAt(playedCards: Card[], activeSequences: Card[][], t
           if (!isOneSideExtension(existing, safePlayedCards, combined)) {
             return { valid: false, newSequence: [] };
           }
-          return { valid: true, newSequence: sortSequence(combined) };
+           return { valid: true, newSequence: sortSequence(combined, jokerPosition) };
         }
     }
   } else if (isSameValueCombo(existing)) {
